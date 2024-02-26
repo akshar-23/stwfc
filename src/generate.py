@@ -6,9 +6,9 @@ from train import (
     encode_tiles,
     train,
     all_neighbors,
-    wfc_neighbors,
     normalize,
     context_key,
+    decode_tiles,
 )
 import numpy as np
 from random import random, randrange
@@ -34,7 +34,7 @@ def log_likelihood(context_distribution, L):
             N = context_key(all_neighbors(L, (i, j)))
             t = L[i, j]
             if N not in context_distribution or t not in context_distribution[N]:
-                P += log(0.001)
+                P += log(0.0001)
             else:
                 P += log(
                     context_distribution[context_key(all_neighbors(L, (i, j)))][L[i, j]]
@@ -68,10 +68,7 @@ def swap(A, p0, p1):
 
 
 def random_map(tile_distribution, size, tile_size):
-    pad_value = ""
-    for _ in range(tile_size * tile_size):
-        pad_value += "X"
-    L = pad(np.full(size, pad_value))
+    L = pad(np.full(size, get_pad_value(tile_size, "X")), 1, tile_size)
     I, J = L.shape
     for i in range(1, I - 1):
         for j in range(1, J - 1):
@@ -99,7 +96,6 @@ def get_distribution(unfinished_level, full_context_counts, tile_size):
 
 def wfc(full_context_counts, size, tile_size):
     L = pad(np.full(size, get_pad_value(tile_size, ".")), 1, tile_size)
-    I, J = L.shape
 
     while get_pad_value(tile_size, ".") in L:
         distribution = get_distribution(L, full_context_counts, tile_size)
@@ -116,27 +112,28 @@ def wfc(full_context_counts, size, tile_size):
             break
         L[most_constrained] = sample(most_constrained_distro)
 
-    possible_U = {}
-    possible_D = {}
-    for i in range(1, I - 1):
-        for j in range(1, J - 1):
-            neighbors = context_key(all_neighbors(L, (i, j)))
-            if neighbors in full_context_distribution:
-                if "U" in full_context_distribution[neighbors]:
-                    possible_U[(i, j)] = full_context_distribution[neighbors]["U"]
-                if "D" in full_context_distribution[neighbors]:
-                    possible_D[(i, j)] = full_context_distribution[neighbors]["D"]
+    # I, J = L.shape
+    # possible_U = {}
+    # possible_D = {}
+    # for i in range(1, I - 1):
+    #     for j in range(1, J - 1):
+    #         neighbors = context_key(all_neighbors(L, (i, j)))
+    #         if neighbors in full_context_distribution:
+    #             if "U" in full_context_distribution[neighbors]:
+    #                 possible_U[(i, j)] = full_context_distribution[neighbors]["U"]
+    #             if "D" in full_context_distribution[neighbors]:
+    #                 possible_D[(i, j)] = full_context_distribution[neighbors]["D"]
 
-    U_distribution = normalize(possible_U)
-    D_distribution = normalize(possible_D)
+    # U_distribution = normalize(possible_U)
+    # D_distribution = normalize(possible_D)
 
-    posU = sample(U_distribution)
-    posD = sample(D_distribution)
+    # posU = sample(U_distribution)
+    # posD = sample(D_distribution)
 
-    if posU is not None:
-        L[posU] = "U"
-    if posD is not None:
-        L[posD] = "D"
+    # if posU is not None:
+    #     L[posU] = "U"
+    # if posD is not None:
+    #     L[posD] = "D"
 
     return L
 
@@ -147,7 +144,7 @@ def mrf(tile_distribution, context_distribution, size, tile_size, generations):
 
     P = log_likelihood(context_distribution, L)
     Ps = [P]
-    for g in range(generations):
+    for _ in range(generations):
         selected = np.pad(np.zeros((I - 2, J - 2)), pad_width=1, constant_values=1)
         unselected = I * J
         while unselected >= 2:
@@ -171,27 +168,54 @@ def mrf(tile_distribution, context_distribution, size, tile_size, generations):
 
 
 if __name__ == "__main__":
-    tile_size = 1
+    tile_size = 2
 
-    levels = []
+    # TRAIN_LEVELS = [TRAIN_LEVELS[0]]
+    overlapping_levels = []
+    non_overlapping_levels = []
     for level in TRAIN_LEVELS:
-        levels.append(encode_tiles(str_to_lvl(level), tile_size))
+        unrolled_level = str_to_lvl(level)
+        encoded_overlapping_level = encode_tiles(unrolled_level, tile_size)
+        encoded_non_overlapping_level = encode_tiles(unrolled_level, tile_size, False)
+        overlapping_levels.append(encoded_overlapping_level)
+        non_overlapping_levels.append(encoded_non_overlapping_level)
+
+    print("Overlap training (WFC)")
+    print(overlapping_levels)
+
+    print("Non overlap training (MRF)")
+    print(non_overlapping_levels)
     (
-        tile_distribution,
-        full_context_distribution,
-        full_context_counts,
-        wfc_context_distribution,
-    ) = train(levels, tile_size)
+        overlapping_tile_distribution,
+        overlapping_full_context_distribution,
+        overlapping_full_context_counts,
+    ) = train(overlapping_levels, tile_size)
 
-    # print(full_context_distribution)
+    (
+        non_overlapping_tile_distribution,
+        non_overlapping_full_context_distribution,
+        non_overlapping_full_context_counts,
+    ) = train(non_overlapping_levels, tile_size)
 
-    # print(full_context_distribution)
-    # print(wfc_context_distribution)
-    # level, likelihoods = mrf(tile_distribution, full_context_distribution, (5, 5), 2, 100000)
-    # print(level)
-    # plt.clf()
-    # plt.plot(likelihoods)
-    # plt.savefig("likelihoods.png")
+    # print(overlapping_full_context_counts)
+    # print(non_overlapping_full_context_counts)
+    print("MRF")
+    encoded_level, likelihoods = mrf(
+        non_overlapping_tile_distribution,
+        non_overlapping_full_context_distribution,
+        (2, 6),
+        tile_size,
+        100,
+    )
+    print(encoded_level)
+    level = decode_tiles(encoded_level, tile_size, False)
+    print(level)
+    plt.clf()
+    plt.plot(likelihoods)
+    plt.savefig("likelihoods.png")
 
-    level = wfc(full_context_counts, (10, 10), tile_size)
+    print("WFC")
+    encoded_level = wfc(overlapping_full_context_counts, (10, 10), tile_size)
+    print(encoded_level)
+    level = decode_tiles(encoded_level, tile_size)
     print(level)

@@ -1,0 +1,60 @@
+
+D:
+
+AVG: 1.0
+Min: 1
+Max: 1
+Counts: 
+
+1: 10
+U:
+
+AVG: 0
+Min: 0
+Max: 0
+Counts: 
+
+0: 10
+#:
+
+AVG: 15.3
+Min: 15
+Max: 16
+Counts: 
+
+15: 7
+16: 3
+.:
+
+AVG: 72.6
+Min: 48
+Max: 84
+Counts: 
+
+48: 1
+51: 1
+70: 2
+79: 3
+82: 1
+84: 2
+B:
+
+AVG: 0
+Min: 0
+Max: 0
+Counts: 
+
+0: 10
+ :
+
+AVG: 31.1
+Min: 20
+Max: 55
+Counts: 
+
+20: 2
+22: 1
+25: 3
+33: 2
+53: 1
+55: 1

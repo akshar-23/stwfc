@@ -1,10 +1,19 @@
 from train_levels import TRAIN_LEVELS
 import numpy as np
+import math
 
 
 def str_to_lvl(str):
     rows = str.split("\n")
     return np.array(list(map(list, rows)))
+
+
+def lvl_to_str(lvl):
+    lvl_str = ""
+    for row in lvl:
+        row_str = "".join(row)
+        lvl_str += row_str + "\n"
+    return lvl_str
 
 
 def get_pad_value(tile_size, pad_char="X"):
@@ -36,17 +45,7 @@ def all_neighbors(L, pos):
 
     for i in range(I - 1, I + 2):
         for j in range(J - 1, J + 2):
-            if i != I or j != J and i == I or j == J:
-                neighbors.append(L[i, j])
-    return neighbors
-
-
-def wfc_neighbors(L, pos):
-    I, J = pos
-    neighbors = []
-    for i in range(I, I + 2):
-        for j in range(J - 1, J + 1):
-            if i != I or j != J:
+            if (i != I or j != J) and (i == I or j == J):
                 neighbors.append(L[i, j])
     return neighbors
 
@@ -55,7 +54,6 @@ def train(levels, tile_size=1):
 
     tile_counts = {}
     full_context_counts = {}
-    wfc_context_counts = {}
     for L in levels:
         L = pad(L, 1, tile_size)
         I, J = L.shape
@@ -66,35 +64,24 @@ def train(levels, tile_size=1):
                     tile_counts[t] = 0
                 tile_counts[t] += 1
                 fc = context_key(all_neighbors(L, (i, j)))
-                wfcc = context_key(wfc_neighbors(L, (i, j)))
                 if fc not in full_context_counts:
                     full_context_counts[fc] = {}
-                if wfcc not in wfc_context_counts:
-                    wfc_context_counts[wfcc] = {}
                 if t not in full_context_counts[fc]:
                     full_context_counts[fc][t] = 0
-                if t not in wfc_context_counts[wfcc]:
-                    wfc_context_counts[wfcc][t] = 0
                 full_context_counts[fc][t] += 1
-                wfc_context_counts[wfcc][t] += 1
 
     tile_distribution = {}
     full_context_distribution = {}
-    wfc_context_distribution = {}
 
     tile_distribution = normalize(tile_counts)
 
     for c, counts in full_context_counts.items():
         full_context_distribution[c] = normalize(counts)
 
-    for c, counts in wfc_context_counts.items():
-        wfc_context_distribution[c] = normalize(counts)
-
     return (
         tile_distribution,
         full_context_distribution,
         full_context_counts,
-        wfc_context_distribution,
     )
 
 
@@ -106,31 +93,80 @@ def normalize(counts):
     return distribution
 
 
-def encode_tiles(level, tile_size):
+def decode_tiles(level, tile_size, overlapping=True):
+    level = level[1:-1, 1:-1]
     I, J = level.shape
 
-    padding = tile_size - 1
+    # Final decoded level size
+    Ie = 0
+    Je = 0
 
-    # Final encoded level size including padding
-    Ie = I + padding
-    Je = J + padding
+    if overlapping:
+        Ie = I + (tile_size - 1)
+        Je = J + (tile_size - 1)
+    else:
+        Ie = I * tile_size
+        Je = J * tile_size
 
+    # Fill an empty array with empty values
+    L = np.full((Ie, Je), ".")
+    for i in range(I):
+        for j in range(J):
+            tiles = np.array(list(level[i, j]))
+            start_i = 0
+            start_j = 0
+            if overlapping:
+                start_i = i
+                start_j = j
+            else:
+                start_i = i * tile_size
+                start_j = j * tile_size
+            ti = 0
+            for li in range(start_i, start_i + tile_size):
+                for lj in range(start_j, start_j + tile_size):
+                    if L[li, lj] != "." and tiles[ti] != "." and L[li, lj] != tiles[ti]:
+                        print("SOMETHING IS HORRIBLY BROKEN")
+                    L[li, lj] = tiles[ti]
+                    ti += 1
+    return L
+
+
+def encode_tiles(level, tile_size, overlapping=True):
+    I, J = level.shape
+
+    # Final encoded level size
+    Ie = 0
+    Je = 0
+    if overlapping:
+        Ie = I - (tile_size - 1)
+        Je = J - (tile_size - 1)
+    else:
+        Ie = math.ceil(I / tile_size)
+        Je = math.ceil(J / tile_size)
+
+    # Fill an empty array with tiles of the appropriate size
     encoding = np.full((Ie, Je), get_pad_value(tile_size))
 
-    # Pad the level so the tiles take into account padding
-    Lp = pad(level, padding)
-
-    # Encode the level with tiles made up of overlapping tilesize x tilesize groups
+    # Encode the level with tilesize x tilesize groups
     for ie in range(Ie):
         for je in range(Je):
-            i = ie + padding
-            j = je + padding
+            offset = tile_size - 1
+            step = 0
+            if overlapping:
+                step = 1
+            else:
+                step = tile_size
+            i = ie * step + offset
+            j = je * step + offset
             tile_key = ""
-            for lpi in range(i - padding, i + 1):
-                for lpj in range(j - padding, j + 1):
-                    tile_key += Lp[lpi, lpj]
+            for li in range(i - (tile_size - 1), i + 1):
+                for lj in range(j - (tile_size - 1), j + 1):
+                    if li > I - 1 or lj > J - 1:
+                        # The level doesn't divide evenly by the tile size; insert wall tiles to make up.
+                        tile_key += "#"
+                    else:
+                        tile_key += level[li, lj]
             encoding[ie, je] = tile_key
-
     return encoding
 
 
@@ -139,14 +175,22 @@ if __name__ == "__main__":
 
     levels = []
     for level in TRAIN_LEVELS:
-        levels.append(encode_tiles(str_to_lvl(level), tile_size))
+        unrolled_level = str_to_lvl(level)
+        encoded_level = encode_tiles(unrolled_level, tile_size)
+        levels.append(encoded_level)
+        print(level)
+        print(unrolled_level)
+        print(encoded_level)
 
     (
         tile_distribution,
         full_context_distribution,
         full_context_counts,
-        wfc_context_distribution,
     ) = train(levels, tile_size)
-    print(tile_distribution)
+
+    # print("Tile Distribution")
+    # print(tile_distribution)
+    print("Context Distribution")
     print(full_context_distribution)
-    print(wfc_context_distribution)
+    print("Context Counts")
+    print(full_context_counts)

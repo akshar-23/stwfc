@@ -1,0 +1,4 @@
+
+Min completion: 0.48125
+Max completion: 0.996875
+Avg completion: 0.7090625
