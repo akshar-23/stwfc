@@ -3,12 +3,14 @@ from src.train import (
     str_to_lvl,
     pad,
     pad_3D,
+    unpad_3D,
     get_pad_value,
     get_pad_value_3D,
     encode_tiles,
     encode_tiles_3D,
     train,
     train_3D_naive,
+    flip_soln,
     all_neighbors,
     all_neighbors_3D,
     normalize,
@@ -102,29 +104,11 @@ def get_distribution(unfinished_level, full_context_counts, tile_size):
     return distribution
 
 
-def get_distribution_3D(unfinished_level, full_context_counts, tile_size):
-    K, I, J = unfinished_level.shape
-    distribution = {}
-    for k in range(1, K - 1):
-        for i in range(1, I - 1):
-            for j in range(1, J - 1):
-                if unfinished_level[k, i, j] == get_pad_value_3D(tile_size, "."):
-                    counts = {}
-                    n_key = context_key(all_neighbors_3D(unfinished_level, (k, i, j)))
-                    for context, tile_counts in full_context_counts.items():
-                        if re.search(n_key, context) is not None:
-                            for t, count in tile_counts.items():
-                                if t not in counts:
-                                    counts[t] = 0
-                                counts[t] += count
-                    distribution[(k, i, j)] = normalize(counts)
-    return distribution
-
-
 def wfc(full_context_counts, size, tile_size):
     L = pad(np.full(size, get_pad_value(tile_size, ".")), 1, tile_size)
 
-    while get_pad_value(tile_size, ".") in L:
+    finished = False
+    while not finished:
         distribution = get_distribution(L, full_context_counts, tile_size)
         most_constrained = (0, 0)
         most_constrained_len = 1000
@@ -136,8 +120,9 @@ def wfc(full_context_counts, size, tile_size):
                 most_constrained_len = distro_len
                 most_constrained_distro = distro
         if most_constrained_distro == {}:
-            break
-        L[most_constrained] = sample(most_constrained_distro)
+            finished = True
+        else:
+            L[most_constrained] = sample(most_constrained_distro)
 
     # I, J = L.shape
     # possible_U = {}
@@ -173,49 +158,72 @@ def get_conditional_tile_distribution(tile_counts, regex):
     return normalize(counts)
 
 
-def wfc_3D_naive(full_context_counts, tile_counts, size, tile_size):
-    L = pad_3D(np.full(size, get_pad_value_3D(tile_size, ".")), 1, tile_size)
-    pk = 0 + 1
-    pi = randrange(size[1] - 1) + 1
-    pj = randrange(size[2] - 1) + 1
-    P_idx = (pk, pi, pj)
-    P_distro = get_conditional_tile_distribution(tile_counts, "P")
-    L[P_idx] = sample(P_distro)
+def propagate(Lep, tile_shape):
     # Propagate to neighbors
-    # Why is this different from the decoding post generation???
-    print("L before propagation")
-    print(L)
-    print("decode to propagate")
-    decoded_L = decode_tiles_3D(L, tile_size)
-    print(decoded_L)
-    L = encode_tiles_3D(decoded_L, tile_size)
-    print("encode again")
-    print(L)
+    Le = unpad_3D(Lep)
+    L = decode_tiles_3D(Le, tile_shape)
+    Le = encode_tiles_3D(L, tile_shape)
+    Lep = pad_3D(Le, tile_shape)
+    return Lep
 
-    while get_pad_value_3D(tile_size, ".") in L:
-        distribution = get_distribution_3D(L, full_context_counts, tile_size)
-        most_constrained = (0, 0, 0)
-        most_constrained_len = 1000
-        most_constrained_distro = {}
-        for index, distro in distribution.items():
-            distro_len = len(distro)
-            if distro_len < most_constrained_len and distro != {}:
-                most_constrained = index
-                most_constrained_len = distro_len
-                most_constrained_distro = distro
+
+def get_most_constrained_3D(L, full_context_counts):
+    K, I, J = L.shape
+    distribution = {}
+    idx = (0, 0, 0)
+    min_len = 1000
+    currT = ""
+    for k in range(1, K - 1):
+        for i in range(1, I - 1):
+            for j in range(1, J - 1):
+                currT = L[k, i, j]
+                if "." in currT:
+                    counts = {}
+                    # Current neighborhood
+                    n_key = context_key(all_neighbors_3D(L, (k, i, j)))
+                    for context, tile_counts in full_context_counts.items():
+                        # If the context matches the neighborhood
+                        if re.search(n_key, context) is not None:
+                            for candidate, count in tile_counts.items():
+                                # If the candidate tile matches the current tile
+                                if re.search(currT, candidate):
+                                    if candidate not in counts:
+                                        counts[candidate] = 0
+                                    counts[candidate] += count
+                    if len(counts) > 0 and len(counts) < min_len:
+                        distribution = normalize(counts)
+                        idx = (k, i, j)
+    return idx, distribution
+
+
+def wfc_3D_naive(full_context_counts, level_shape, tile_shape):
+    K, I, J = level_shape
+    # Initialize with randomly placed P in timestep 0.
+    L = np.full(level_shape, ".")
+    Pk = 0
+    Pi = randrange(1, I - 1)
+    Pj = randrange(1, J - 1)
+    Pidx = (Pk, Pi, Pj)
+    L[Pidx] = "P"
+    Le = encode_tiles_3D(L, tile_shape)
+    Lep = pad_3D(Le, tile_shape)
+
+    finished = False
+    while not finished:
+        most_constrained_idx, most_constrained_distro = get_most_constrained_3D(
+            Lep, full_context_counts
+        )
+
         if most_constrained_distro == {}:
-            break
-        tile = sample(most_constrained_distro)
-        L[most_constrained] = tile
-        # Propagate to neighbors
-        print("L before propagation")
-        print(L)
-        print("decode to propagate")
-        decoded_L = decode_tiles_3D(L, tile_size)
-        print(decoded_L)
-        L = encode_tiles_3D(decoded_L, tile_size)
-        print("encode again")
-        print(L)
+            finished = True
+        else:
+            tile = sample(most_constrained_distro)
+            Lep[most_constrained_idx] = tile
+            Lep = propagate(Lep, tile_shape)
+
+    # Decode
+    Le = unpad_3D(Lep)
+    L = decode_tiles_3D(Le, tile_shape)
     return L
 
 
@@ -336,8 +344,8 @@ def train_generate_3D(
     experiment_folder,
     solutions_folder,
     level_range,
-    gen_size=(5, 5, 5),
-    tile_size=1,
+    gen_shape=(5, 5, 5),
+    tile_shape=1,
     num_levels=1,
 ):
     overlapping_levels = []
@@ -351,28 +359,26 @@ def train_generate_3D(
             # Replace B' with B
             level[level == "B'"] = "B"
 
-        encoded_overlapping_level = encode_tiles_3D(level, tile_size)
+        encoded_overlapping_level = encode_tiles_3D(level, tile_shape)
         overlapping_levels.append(encoded_overlapping_level)
 
+        flipped_level = flip_soln(level)
+        encoded_flipped_level = encode_tiles_3D(flipped_level, tile_shape)
+        overlapping_levels.append(encoded_flipped_level)
     (
         overlapping_tile_distribution,
         overlapping_tile_counts,
         overlapping_full_context_distribution,
         overlapping_full_context_counts,
-    ) = train_3D_naive(overlapping_levels, tile_size)
+    ) = train_3D_naive(overlapping_levels, tile_shape)
 
     Path(experiment_folder).mkdir(parents=True, exist_ok=True)
     for i in range(num_levels):
-        encoded_level = wfc_3D_naive(
+        level = wfc_3D_naive(
             overlapping_full_context_counts,
-            overlapping_tile_counts,
-            gen_size,
-            tile_size,
+            gen_shape,
+            tile_shape,
         )
-        print(f"ENCODED {i}")
-        print(encoded_level)
-        level = decode_tiles_3D(encoded_level, tile_size)
-        print(f"DECODED {i}")
         print(level)
         with open(f"{experiment_folder}/{i}.txt", "w", encoding="utf-8") as f:
             f.write(str(level))
@@ -380,15 +386,39 @@ def train_generate_3D(
 
 
 if __name__ == "__main__":
-    level_range = [0, 1, 2, 3]
-    gen_size = (2, 5, 10)
-    tile_size = 2
+    level_range = ["A", 1, 2, 3, 4]
+    gen_shape = (10, 6, 10)
+    tile_shape = (2, 3, 2)
     num_levels = 1
     train_generate_3D(
-        f"experiments_naive_P_seeded{level_range}{gen_size}{tile_size}",
+        f"experiments_naive_P_seededr{level_range}g{gen_shape}t{tile_shape}",
         "solutions",
         level_range,
-        gen_size,
-        tile_size,
+        gen_shape,
+        tile_shape,
         num_levels,
     )
+
+    # tile_size = 2
+    # L = np.array([
+    #     [["A", "B", "C"], ["D", "E", "F"], ["G", "H", "I"]],
+    #     [["J", "K", "L"], ["M", "N", "O"], ["P", "Q", "R"]],
+    #     [["S", "T", "U"], ["V", "W", "X"], ["Y", "Z", "0"]],
+    # ])
+    # print(L)
+
+    # print("Encoded: ")
+    # eL = encode_tiles_3D(L, 2)
+    # print(eL)
+
+    # print("Padded:")
+    # peL = pad_3D(eL, tile_size)
+    # print(peL)
+
+    # print("Unpadded:")
+    # eL = unpad_3D(peL)
+    # print(eL)
+
+    # print("Decoded: ")
+    # L = decode_tiles_3D(eL, 2)
+    # print(L)

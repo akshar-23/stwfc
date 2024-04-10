@@ -3,6 +3,8 @@ import json
 import time
 from pathlib import Path
 from trrbt.game_agent import AgentBlockdudeProcessor
+from trrbt.game_viz import ThreadedGameProcessor, run_game, run_game_input_viz
+import threading
 
 
 def find_solution(n):
@@ -29,12 +31,27 @@ def find_all_solutions():
         print(soln)
 
 
+def record_play_history(n):
+    level_file = f"../pyrrbt/games/blockdude_levels/blockdude_{n}.yaml"
+    mtx = threading.Lock()
+    game_proc = ThreadedGameProcessor(level_file, [], None, mtx)
+    game_thread = threading.Thread(target=run_game, args=(game_proc,), daemon=True)
+
+    run_game_input_viz(game_proc, game_thread, 50, None)
+    soln = game_proc.history
+    soln_file = Path(f"src/solutions/blockdude_{n}_solution.json")
+    with open(soln_file, "w", encoding="utf-8") as f:
+        json.dump(soln, f, ensure_ascii=False, indent=4)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Find Blockdude solutions.")
-    parser.add_argument("--level", type=int, help="Level number")
+    parser.add_argument("--level", type=int, help="Level number for automatic solver")
+    parser.add_argument("--play_level", type=int, help="Level number for manual play")
     args = parser.parse_args()
+    if args.play_level is not None:
+        soln = record_play_history(args.play_level)
     if args.level is not None:
         soln = find_solution(args.level)
-        print(soln)
     else:
         find_all_solutions()
