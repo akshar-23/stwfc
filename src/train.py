@@ -18,9 +18,9 @@ def lvl_to_str(lvl):
     return lvl_str
 
 
-def get_pad_value(tile_size, pad_char="X"):
+def get_pad_value_2D(tile_shape, pad_char="X"):
     pad_value = ""
-    for _ in range(tile_size * tile_size):
+    for _ in range(np.prod(tile_shape)):
         pad_value += pad_char
     return pad_value
 
@@ -42,8 +42,12 @@ def unpad_3D(grid, pad_width=1):
     return grid[pad_width:-pad_width, pad_width:-pad_width, pad_width:-pad_width]
 
 
-def pad(grid, width=1, tile_size=1):
-    pad_value = get_pad_value(tile_size)
+def unpad_2D(grid, pad_width=1):
+    return grid[pad_width:-pad_width, pad_width:-pad_width]
+
+
+def pad_2D(grid, tile_shape=(1, 1), width=1):
+    pad_value = get_pad_value_2D(tile_shape)
     return np.pad(grid, pad_width=width, constant_values=pad_value)
 
 
@@ -149,12 +153,12 @@ def train_3D(solutions, tile_size=1):
     return transitions
 
 
-def train(levels, tile_size=1):
+def train_2D(levels, tile_shape=(1, 1), neighbor_fn=all_neighbors):
 
     tile_counts = {}
     full_context_counts = {}
     for L in levels:
-        L = pad(L, 1, tile_size)
+        L = pad_2D(L, tile_shape)
         I, J = L.shape
         for i in range(1, I - 1):
             for j in range(1, J - 1):
@@ -162,7 +166,7 @@ def train(levels, tile_size=1):
                 if t not in tile_counts:
                     tile_counts[t] = 0
                 tile_counts[t] += 1
-                fc = context_key(all_neighbors(L, (i, j)))
+                fc = context_key(neighbor_fn(L, (i, j)))
                 if fc not in full_context_counts:
                     full_context_counts[fc] = {}
                 if t not in full_context_counts[fc]:
@@ -193,40 +197,43 @@ def normalize(counts):
     return distribution
 
 
-def decode_tiles(level, tile_size, overlapping=True):
-    level = level[1:-1, 1:-1]
+def decode_tiles_2D(level, tile_shape, overlapping=True):
     I, J = level.shape
 
     # Final decoded level size
-    Ie = 0
-    Je = 0
+    Id = 0
+    Jd = 0
 
+    ishape, jshape = tile_shape
     if overlapping:
-        Ie = I + (tile_size - 1)
-        Je = J + (tile_size - 1)
+        Id = I + (ishape - 1)
+        Jd = J + (jshape - 1)
     else:
-        Ie = I * tile_size
-        Je = J * tile_size
+        Id = I * ishape
+        Jd = J * jshape
 
     # Fill an empty array with empty values
-    L = np.full((Ie, Je), ".")
+    L = np.full((Id, Jd), ".")
     for i in range(I):
         for j in range(J):
             tiles = np.array(list(level[i, j]))
+
             start_i = 0
             start_j = 0
             if overlapping:
                 start_i = i
                 start_j = j
             else:
-                start_i = i * tile_size
-                start_j = j * tile_size
+                start_i = i * ishape
+                start_j = j * jshape
+
             ti = 0
-            for li in range(start_i, start_i + tile_size):
-                for lj in range(start_j, start_j + tile_size):
+            for li in range(start_i, start_i + ishape):
+                for lj in range(start_j, start_j + jshape):
                     if L[li, lj] != "." and tiles[ti] != "." and L[li, lj] != tiles[ti]:
-                        print("SOMETHING IS HORRIBLY BROKEN")
-                    L[li, lj] = tiles[ti]
+                        raise Exception("SOMETHING IS HORRIBLY BROKEN")
+                    if tiles[ti] != ".":
+                        L[li, lj] = tiles[ti]
                     ti += 1
     return L
 
@@ -239,14 +246,15 @@ def decode_tiles_3D(level, tile_shape, overlapping=True):
     Id = 0
     Jd = 0
 
+    kshape, ishape, jshape = tile_shape
     if overlapping:
-        Kd = K + (tile_shape[0] - 1)
-        Id = I + (tile_shape[1] - 1)
-        Jd = J + (tile_shape[2] - 1)
+        Kd = K + (kshape - 1)
+        Id = I + (ishape - 1)
+        Jd = J + (jshape - 1)
     else:
-        Kd = K * tile_size
-        Id = I * tile_size
-        Jd = J * tile_size
+        Kd = K * kshape
+        Id = I * ishape
+        Jd = J * jshape
 
     # Fill an empty array with empty values
     L = np.full((Kd, Id, Jd), ".")
@@ -276,46 +284,49 @@ def decode_tiles_3D(level, tile_shape, overlapping=True):
                                 and tiles[ti] != "."
                                 and L[ki, li, lj] != tiles[ti]
                             ):
-                                print("SOMETHING IS HORRIBLY BROKEN")
+                                raise Exception("SOMETHING IS HORRIBLY BROKEN")
                             if tiles[ti] != ".":
                                 L[ki, li, lj] = tiles[ti]
                             ti += 1
     return L
 
 
-def encode_tiles(level, tile_size, overlapping=True):
+def encode_tiles_2D(level, tile_shape, overlapping=True):
     I, J = level.shape
 
     # Final encoded level size
     Ie = 0
     Je = 0
+    ishape, jshape = tile_shape
     if overlapping:
-        Ie = I - (tile_size - 1)
-        Je = J - (tile_size - 1)
+        Ie = I - (ishape - 1)
+        Je = J - (jshape - 1)
     else:
-        Ie = math.ceil(I / tile_size)
-        Je = math.ceil(J / tile_size)
+        Ie = math.ceil(I / ishape)
+        Je = math.ceil(J / jshape)
 
     # Fill an empty array with tiles of the appropriate size
-    encoding = np.full((Ie, Je), get_pad_value(tile_size))
+    encoding = np.full((Ie, Je), get_pad_value_3D(tile_shape))
 
     # Encode the level with tilesize x tilesize groups
     for ie in range(Ie):
         for je in range(Je):
-            offset = tile_size - 1
-            step = 0
+            istep = 0
+            jstep = 0
             if overlapping:
-                step = 1
+                istep = 1
+                jstep = 1
             else:
-                step = tile_size
-            i = ie * step + offset
-            j = je * step + offset
+                istep = ishape
+                jstep = jshape
+            i = ie * istep + (ishape - 1)
+            j = je * jstep + (jshape - 1)
             tile_key = ""
-            for li in range(i - (tile_size - 1), i + 1):
-                for lj in range(j - (tile_size - 1), j + 1):
+            for li in range(i - (ishape - 1), i + 1):
+                for lj in range(j - (jshape - 1), j + 1):
                     if li > I - 1 or lj > J - 1:
                         # The level doesn't divide evenly by the tile size; insert wall tiles to make up.
-                        tile_key += "#"
+                        tile_key += "W"
                     else:
                         tile_key += level[li, lj]
             encoding[ie, je] = tile_key
@@ -345,18 +356,25 @@ def encode_tiles_3D(level, tile_shape, overlapping=True):
     for ke in range(Ke):
         for ie in range(Ie):
             for je in range(Je):
-                step = 0
+                kshape, ishape, jshape = tile_shape
+                kstep = 0
+                istep = 0
+                jstep = 0
                 if overlapping:
-                    step = 1
+                    kstep = 1
+                    istep = 1
+                    jstep = 1
                 else:
-                    step = tile_size
-                k = ke * step + (tile_shape[0] - 1)
-                i = ie * step + (tile_shape[1] - 1)
-                j = je * step + (tile_shape[2] - 1)
+                    kstep = kshape
+                    istep = ishape
+                    jstep = jshape
+                k = ke * kstep + (kshape - 1)
+                i = ie * istep + (ishape - 1)
+                j = je * jstep + (jshape - 1)
                 tile_key = ""
-                for lk in range(k - (tile_shape[0] - 1), k + 1):
-                    for li in range(i - (tile_shape[1] - 1), i + 1):
-                        for lj in range(j - (tile_shape[2] - 1), j + 1):
+                for lk in range(k - (kshape - 1), k + 1):
+                    for li in range(i - (ishape - 1), i + 1):
+                        for lj in range(j - (jshape - 1), j + 1):
                             if lk > K - 1 or li > I - 1 or lj > J - 1:
                                 # The level doesn't divide evenly by the tile size; insert wall tiles to make up.
                                 tile_key += "W"
