@@ -14,7 +14,7 @@ from src.train import (
     train_3D_naive,
     flip_soln,
     flip_over_vertical,
-    all_neighbors,
+    all_neighbors_2D,
     all_neighbors_3D,
     normalize,
     context_key,
@@ -28,6 +28,8 @@ import matplotlib.pyplot as plt
 import re
 import json
 from pathlib import Path
+import time
+import copy
 
 
 def sample(distribution):
@@ -196,11 +198,14 @@ def propagate_neighbors(Lep, tile_shape, full_context_counts):
                     # Current neighborhood
                     n_key = context_key(all_neighbors_3D(Lep, idx))
                     for context, tile_counts in full_context_counts.items():
-                        # If the candidate neighborhood matches the current neighborhood
-                        if re.search(n_key, context) is not None:
-                            for candidate, count in tile_counts.items():
-                                # If the candidate tile matches the current tile
-                                if re.search(currT, candidate):
+                        for candidate, count in tile_counts.items():
+                            # If the candidate tile matches the current tile
+                            if re.search(currT, candidate):
+                                if candidate not in counts:
+                                    # Candidate is compatible but may not be seen in training.
+                                    counts[candidate] = 1
+                                # If the candidate neighborhood matches the current neighborhood
+                                if re.search(n_key, context) is not None:
                                     if candidate not in counts:
                                         counts[candidate] = 0
                                     counts[candidate] += count
@@ -252,38 +257,63 @@ def propagate_neighbors_2D(Lep, tile_shape, full_context_counts):
     return Lep, did_propagate, min_idx, min_distribution
 
 
-def wfc_3D_naive(full_context_counts, level_shape, tile_shape):
+def wfc_3D_naive(
+    full_context_counts, level_shape, tile_shape, max_num_trials=100, seed_vals=["P"]
+):
     K, I, J = level_shape
     # Initialize with randomly placed P in timestep 0.
     L = np.full(level_shape, ".")
-    Pk = 0
-    Pi = randrange(1, I - 1)
-    Pj = randrange(1, J - 1)
-    Pidx = (Pk, Pi, Pj)
-    # L[Pidx] = "P"
-    L[0][I - 1] = ["W"] * J
-    Le = encode_tiles_3D(L, tile_shape)
-    Lep = pad_3D(Le, tile_shape)
+    num_trials = 0
+    best = L
+    best_contra_count = 1000
+    best_num_samples = 0
+    while "." in L and num_trials < max_num_trials:
+        print(f"--{num_trials}")
+        num_samples = 0
+        L = np.full(level_shape, ".")
+        for s in seed_vals:
+            sk = 0
+            si = randrange(1, I - 1)
+            sj = randrange(1, J - 1)
+            sidx = (sk, si, sj)
+            L[sidx] = s
 
-    finished = False
-    while not finished:
-        did_propagate = True
-        while did_propagate:
-            Lep, did_propagate, most_constrained_idx, most_constrained_distro = (
-                propagate_neighbors(Lep, tile_shape, full_context_counts)
-            )
+        # Bottom row is always "W"
+        L[0][I - 1] = ["W"] * J
+        Le = encode_tiles_3D(L, tile_shape)
+        Lep = pad_3D(Le, tile_shape)
 
-        if most_constrained_distro == {}:
-            finished = True
-        else:
-            tile = sample(most_constrained_distro)
-            Lep[most_constrained_idx] = tile
-            Lep = propagate_overlapping(Lep, tile_shape)
+        finished = False
+        while not finished:
+            did_propagate = True
+            while did_propagate:
+                Lep, did_propagate, most_constrained_idx, most_constrained_distro = (
+                    propagate_neighbors(Lep, tile_shape, full_context_counts)
+                )
 
-    # Decode
-    Le = unpad_3D(Lep)
-    L = decode_tiles_3D(Le, tile_shape)
-    return L
+            if most_constrained_distro == {}:
+                finished = True
+            else:
+                tile = sample(most_constrained_distro)
+                set_tile = list(Lep[most_constrained_idx])
+                for i in range(len(set_tile)):
+                    if set_tile[i] == ".":
+                        set_tile[i] = tile[i]
+                        break
+                Lep[most_constrained_idx] = "".join(set_tile)
+                Lep = propagate_overlapping(Lep, tile_shape)
+                num_samples += 1
+        Le = unpad_3D(Lep)
+        L = decode_tiles_3D(Le, tile_shape)
+        count_L = np.count_nonzero(L == ".")
+        if count_L < best_contra_count:
+            best = copy.deepcopy(L)
+            best_contra_count = count_L
+            best_num_samples = num_samples
+        num_trials += 1
+        print(f"--samples {num_samples}")
+
+    return best, num_trials, num_samples
 
 
 def wfc_3D(transitions, path_length, tile_size):
@@ -406,11 +436,25 @@ def train_generate_3D(
     gen_shape=(5, 5, 5),
     tile_shape=(1, 1, 1),
     num_levels=1,
+    max_num_trials=100,
+    seed_vals=["P"],
 ):
+    # fdisplay = "solutions_display"
+    # Path(fdisplay).mkdir(parents=True, exist_ok=True)
+    # for s, soln in enumerate(levels):
+    #     fsolndisplay = f"{fdisplay}/level{s}"
+    #     Path(fsolndisplay).mkdir(parents=True, exist_ok=True)
+    #     for b, board in enumerate(soln):
+    #         b_str = str(b)
+    #         while len(b_str) < 3:
+    #             b_str = "0" + b_str
+    #         with open(f"{fsolndisplay}/step{b_str}.lvl", "w", encoding="utf-8") as f:
+    #             f.write(lvl_to_str(board))
     levels = []
     overlapping_levels = []
     for i in level_range:
-        soln_file = Path(f"src/{solutions_folder}/blockdude_{i}_solution.json")
+        soln_folder = f"src/{solutions_folder}/blockdude_{i}"
+        soln_file = Path(f"{soln_folder}/solution.json")
         with open(soln_file) as f:
             level = np.array(json.load(f))
             # Remove LV# row from level
@@ -436,28 +480,47 @@ def train_generate_3D(
         full_context_counts,
     ) = train_3D_naive(overlapping_levels, tile_shape)
 
-    # Path(experiment_folder).mkdir(parents=True, exist_ok=True)
-    # for i in range(num_levels):
-    #     level = wfc_3D_naive(
-    #         full_context_counts,
-    #         gen_shape,
-    #         tile_shape,
-    #     )
-    #     print(level)
-    #     with open(f"{experiment_folder}/{i}.txt", "w", encoding="utf-8") as f:
-    #         f.write(str(level))
-
-    fdisplay = "solutions_display"
-    Path(fdisplay).mkdir(parents=True, exist_ok=True)
-    for s, soln in enumerate(levels):
-        fsolndisplay = f"{fdisplay}/level{s}"
-        Path(fsolndisplay).mkdir(parents=True, exist_ok=True)
-        for b, board in enumerate(soln):
+    Path(experiment_folder).mkdir(parents=True, exist_ok=True)
+    num_complete = 0
+    total_start = time.time()
+    for i in range(num_levels):
+        start_time = time.time()
+        level, num_trials, num_samples = wfc_3D_naive(
+            full_context_counts, gen_shape, tile_shape, max_num_trials, seed_vals
+        )
+        end_time = time.time()
+        elapsed = end_time - start_time
+        print(f"found level {i} in {num_trials} trials")
+        print(level)
+        level_folder = f"{experiment_folder}/{i}"
+        Path(level_folder).mkdir(parents=True, exist_ok=True)
+        with open(f"{level_folder}/raw.json", "w", encoding="utf-8") as f:
+            json.dump(level.tolist(), f, ensure_ascii=False, indent=4)
+        with open(f"{level_folder}/stats.txt", "w", encoding="utf-8") as f:
+            f.write(f"Num trials: {str(num_trials)}/{str(max_num_trials)}")
+            f.write(f"\nNum samples: {str(num_samples)}")
+            f.write(f"\nElapsed: {str(elapsed)}")
+        display_folder = f"{level_folder}/display"
+        Path(display_folder).mkdir(parents=True, exist_ok=True)
+        for b, board in enumerate(level):
             b_str = str(b)
             while len(b_str) < 3:
                 b_str = "0" + b_str
-            with open(f"{fsolndisplay}/step{b_str}.lvl", "w", encoding="utf-8") as f:
+            with open(f"{display_folder}/{b_str}.lvl", "w", encoding="utf-8") as f:
                 f.write(lvl_to_str(board))
+        if "." not in level:
+            num_complete += 1
+    total_end = time.time()
+    total_elapsed = total_end - total_start
+    with open(f"{experiment_folder}/stats.txt", "w", encoding="utf-8") as f:
+        f.write("3D trials")
+        f.write(f"\nretry x {max_num_trials}")
+        f.write(f"\nseeded with {seed_vals}")
+        f.write(f"\ntrained on {level_range}")
+        f.write(f"\ngeneration shape {gen_shape}")
+        f.write(f"\ntile shape {tile_shape}")
+        f.write(f"\ncomplete levels {str(num_complete)}/{num_levels}")
+        f.write(f"\nelapsed time {str(total_elapsed)}")
     return
 
 
@@ -512,16 +575,20 @@ def train_generate_2D(
 
 if __name__ == "__main__":
     level_range = ["A", 1, 2, 3, 4]
-    gen_shape = (6, 4, 10)
-    tile_shape = (2, 3, 2)
-    num_levels = 1
+    gen_shape = (5, 7, 10)
+    tile_shape = (3, 3, 3)
+    num_levels = 10
+    max_num_trials = 10
+    seed_vals = ["P"]
     train_generate_3D(
-        f"experiments_naive_P_seededr{level_range}g{gen_shape}t{tile_shape}",
+        f"experiments_singletile_fuzz/3D/{time.time()}",
         "solutions",
         level_range,
         gen_shape,
         tile_shape,
         num_levels,
+        max_num_trials,
+        seed_vals,
     )
 
     # gen_shape = (6, 10)

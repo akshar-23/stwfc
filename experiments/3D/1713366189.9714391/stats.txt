@@ -1,0 +1,8 @@
+3D trials
+retry x 10
+seeded with ['P']
+trained on ['A', 1, 2, 3, 4]
+generation shape (5, 7, 10)
+tile shape (2, 2, 2)
+complete levels 0/10
+elapsed time 1292.092989206314

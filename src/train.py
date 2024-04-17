@@ -62,14 +62,14 @@ def key_to_arr(key):
     return list(key)
 
 
-def all_neighbors(L, pos):
-    I, J = pos
+def all_neighbors_2D(L, pos):
+    _, I, J = pos
     neighbors = []
 
     for i in range(I - 1, I + 2):
         for j in range(J - 1, J + 2):
             if (i != I or j != J) and (i == I or j == J):
-                neighbors.append(L[i, j])
+                neighbors.append(L[0, i, j])
     return neighbors
 
 
@@ -78,9 +78,10 @@ def all_neighbors_3D(L, idx):
     neighbors = []
 
     for k in range(K - 1, K + 2):
-        for j in range(J - 1, J + 2):
-            if k != K or j != J:
-                neighbors.append(L[k, I, j])
+        for i in range(I - 1, I + 2):
+            for j in range(J - 1, J + 2):
+                if k != K or i != I or j != J:
+                    neighbors.append(L[k, i, j])
     return neighbors
 
 
@@ -153,7 +154,7 @@ def train_3D(solutions, tile_size=1):
     return transitions
 
 
-def train_2D(levels, tile_shape=(1, 1), neighbor_fn=all_neighbors):
+def train_2D(levels, tile_shape=(1, 1), neighbor_fn=all_neighbors_2D):
 
     tile_counts = {}
     full_context_counts = {}
