@@ -1,0 +1,15 @@
+3D trials
+retry x 10
+seeded with ['P']
+trained on ['A', 1, 2, 3, 4]
+generation shape (5, 7, 10)
+tile shape (2, 3, 2)
+fuzz? False
+single char? False
+complete levels 3/10
+elapsed time 1247.8537290096283
+avg num trials: 8.0
+avg num samples: 10.0
+neighborhood: horizontal_neighbors_3D
+
+results: mostly incomplete, some near complete and some "complete" with disappearing P.

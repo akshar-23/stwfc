@@ -11,6 +11,7 @@ def all_neighbors(L, idx, depth=1, pad_value="X"):
         end = idx[i] + 2 * depth + 1
         neighbors = neighbors[start:end]
 
+    
     # TODO remove self from neighbors
     # double check start/end idx
 

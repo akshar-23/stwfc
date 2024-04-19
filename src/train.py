@@ -85,7 +85,18 @@ def all_neighbors_3D(L, idx):
     return neighbors
 
 
-def train_3D_naive(levels, tile_shape, neighbor_fn=all_neighbors_3D):
+def horizontal_neighbors_3D(L, idx):
+    K, I, J = idx
+    neighbors = []
+
+    for k in range(K - 1, K + 2):
+        for j in range(J - 1, J + 2):
+            if k != K or j != J:
+                neighbors.append(L[k, I, j])
+    return neighbors
+
+
+def train_3D_naive(levels, tile_shape, neighborhood_fn=all_neighbors_3D):
     tile_counts = {}
     full_context_counts = {}
     for L in levels:
@@ -98,7 +109,7 @@ def train_3D_naive(levels, tile_shape, neighbor_fn=all_neighbors_3D):
                     if t not in tile_counts:
                         tile_counts[t] = 0
                     tile_counts[t] += 1
-                    fc = context_key(neighbor_fn(L, (k, i, j)))
+                    fc = context_key(neighborhood_fn(L, (k, i, j)))
                     if fc not in full_context_counts:
                         full_context_counts[fc] = {}
                     if t not in full_context_counts[fc]:

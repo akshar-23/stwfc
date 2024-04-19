@@ -16,6 +16,7 @@ from src.train import (
     flip_over_vertical,
     all_neighbors_2D,
     all_neighbors_3D,
+    horizontal_neighbors_3D,
     normalize,
     context_key,
     decode_tiles_2D,
@@ -30,6 +31,7 @@ import json
 from pathlib import Path
 import time
 import copy
+import multiprocessing
 
 
 def sample(distribution):
@@ -181,7 +183,9 @@ def resolve_candidates(tile, candidates):
     return res
 
 
-def propagate_neighbors(Lep, tile_shape, full_context_counts):
+def propagate_neighbors(
+    Lep, tile_shape, full_context_counts, fuzz=False, neighborhood_fn=all_neighbors_3D
+):
     K, I, J = Lep.shape
     min_distribution = {}
     min_idx = (0, 0, 0)
@@ -196,12 +200,12 @@ def propagate_neighbors(Lep, tile_shape, full_context_counts):
                 if "." in currT:
                     counts = {}
                     # Current neighborhood
-                    n_key = context_key(all_neighbors_3D(Lep, idx))
+                    n_key = context_key(neighborhood_fn(Lep, idx))
                     for context, tile_counts in full_context_counts.items():
                         for candidate, count in tile_counts.items():
                             # If the candidate tile matches the current tile
                             if re.search(currT, candidate):
-                                if candidate not in counts:
+                                if candidate not in counts and fuzz:
                                     # Candidate is compatible but may not be seen in training.
                                     counts[candidate] = 1
                                 # If the candidate neighborhood matches the current neighborhood
@@ -258,7 +262,14 @@ def propagate_neighbors_2D(Lep, tile_shape, full_context_counts):
 
 
 def wfc_3D_naive(
-    full_context_counts, level_shape, tile_shape, max_num_trials=100, seed_vals=["P"]
+    full_context_counts,
+    level_shape,
+    tile_shape,
+    max_num_trials=100,
+    seed_vals=["P"],
+    fuzz=False,
+    single_char=True,
+    neighborhood_fn=all_neighbors_3D,
 ):
     K, I, J = level_shape
     # Initialize with randomly placed P in timestep 0.
@@ -268,7 +279,7 @@ def wfc_3D_naive(
     best_contra_count = 1000
     best_num_samples = 0
     while "." in L and num_trials < max_num_trials:
-        print(f"--{num_trials}")
+        # print(f"--{num_trials}")
         num_samples = 0
         L = np.full(level_shape, ".")
         for s in seed_vals:
@@ -288,19 +299,26 @@ def wfc_3D_naive(
             did_propagate = True
             while did_propagate:
                 Lep, did_propagate, most_constrained_idx, most_constrained_distro = (
-                    propagate_neighbors(Lep, tile_shape, full_context_counts)
+                    propagate_neighbors(
+                        Lep, tile_shape, full_context_counts, fuzz, neighborhood_fn
+                    )
                 )
 
             if most_constrained_distro == {}:
                 finished = True
             else:
                 tile = sample(most_constrained_distro)
-                set_tile = list(Lep[most_constrained_idx])
-                for i in range(len(set_tile)):
-                    if set_tile[i] == ".":
-                        set_tile[i] = tile[i]
-                        break
-                Lep[most_constrained_idx] = "".join(set_tile)
+                if not single_char:
+                    # Set the entire tile at once
+                    Lep[most_constrained_idx] = tile
+                else:
+                    # set a single tile
+                    set_tile = list(Lep[most_constrained_idx])
+                    for i in range(len(set_tile)):
+                        if set_tile[i] == ".":
+                            set_tile[i] = tile[i]
+                            break
+                    Lep[most_constrained_idx] = "".join(set_tile)
                 Lep = propagate_overlapping(Lep, tile_shape)
                 num_samples += 1
         Le = unpad_3D(Lep)
@@ -311,9 +329,9 @@ def wfc_3D_naive(
             best_contra_count = count_L
             best_num_samples = num_samples
         num_trials += 1
-        print(f"--samples {num_samples}")
+        # print(f"--samples {num_samples}")
 
-    return best, num_trials, num_samples
+    return best, num_trials, best_num_samples
 
 
 def wfc_3D(transitions, path_length, tile_size):
@@ -438,6 +456,9 @@ def train_generate_3D(
     num_levels=1,
     max_num_trials=100,
     seed_vals=["P"],
+    fuzz=False,
+    single_char=True,
+    neighborhood_fn=all_neighbors_3D,
 ):
     # fdisplay = "solutions_display"
     # Path(fdisplay).mkdir(parents=True, exist_ok=True)
@@ -478,20 +499,31 @@ def train_generate_3D(
         tile_counts,
         full_context_distribution,
         full_context_counts,
-    ) = train_3D_naive(overlapping_levels, tile_shape)
+    ) = train_3D_naive(overlapping_levels, tile_shape, neighborhood_fn)
 
     Path(experiment_folder).mkdir(parents=True, exist_ok=True)
     num_complete = 0
     total_start = time.time()
+    aggregate_trials = 0
+    aggregate_samples = 0
     for i in range(num_levels):
         start_time = time.time()
         level, num_trials, num_samples = wfc_3D_naive(
-            full_context_counts, gen_shape, tile_shape, max_num_trials, seed_vals
+            full_context_counts,
+            gen_shape,
+            tile_shape,
+            max_num_trials,
+            seed_vals,
+            fuzz,
+            single_char,
+            neighborhood_fn,
         )
+        aggregate_trials += num_trials
+        aggregate_samples += num_samples
         end_time = time.time()
         elapsed = end_time - start_time
-        print(f"found level {i} in {num_trials} trials")
-        print(level)
+        # print(f"found level {i} in {num_trials} trials")
+        # print(level)
         level_folder = f"{experiment_folder}/{i}"
         Path(level_folder).mkdir(parents=True, exist_ok=True)
         with open(f"{level_folder}/raw.json", "w", encoding="utf-8") as f:
@@ -519,8 +551,13 @@ def train_generate_3D(
         f.write(f"\ntrained on {level_range}")
         f.write(f"\ngeneration shape {gen_shape}")
         f.write(f"\ntile shape {tile_shape}")
+        f.write(f"\nfuzz? {str(fuzz)}")
+        f.write(f"\nsingle char? {str(single_char)}")
         f.write(f"\ncomplete levels {str(num_complete)}/{num_levels}")
         f.write(f"\nelapsed time {str(total_elapsed)}")
+        f.write(f"\navg num trials: {str(aggregate_trials/num_levels)}")
+        f.write(f"\navg num samples: {str(aggregate_samples/num_levels)}")
+        f.write(f"\nneighborhood: {str(neighborhood_fn.__name__)}")
     return
 
 
@@ -544,6 +581,15 @@ def train_generate_2D(
                 level = level[1:, :]
             # Replace B' with B
             level[level == "B'"] = "B"
+        
+        soln_display_folder = f"src/{solutions_folder}_display/level{i}"
+        Path(display_folder).mkdir(parents=True, exist_ok=True)
+        for b, board in enumerate(level):
+            b_str = str(b)
+            while len(b_str) < 3:
+                b_str = "0" + b_str
+            with open(f"{soln_display_folder}/{b_str}.lvl", "w", encoding="utf-8") as f:
+                f.write(lvl_to_str(board))
 
         encoded_overlapping_level = encode_tiles_2D(level, tile_shape)
         overlapping_levels.append(encoded_overlapping_level)
@@ -567,7 +613,7 @@ def train_generate_2D(
             gen_shape,
             tile_shape,
         )
-        print(level)
+        # print(level)
         with open(f"{experiment_folder}/{i}.txt", "w", encoding="utf-8") as f:
             f.write(str(level))
     return
@@ -576,20 +622,38 @@ def train_generate_2D(
 if __name__ == "__main__":
     level_range = ["A", 1, 2, 3, 4]
     gen_shape = (5, 7, 10)
-    tile_shape = (3, 3, 3)
+    tile_shapes = [(2, 3, 2), (2, 2, 2)]
     num_levels = 10
     max_num_trials = 10
-    seed_vals = ["P"]
-    train_generate_3D(
-        f"experiments_singletile_fuzz/3D/{time.time()}",
-        "solutions",
-        level_range,
-        gen_shape,
-        tile_shape,
-        num_levels,
-        max_num_trials,
-        seed_vals,
-    )
+    seed_valss = [["P"], []]
+    fuzzs = [True, False]
+    single_chars = [True, False]
+    neighborhood_fns = [all_neighbors_3D, horizontal_neighbors_3D]
+
+    arg_combos = []
+
+    for tile_shape in tile_shapes:
+        for seed_vals in seed_valss:
+            for fuzz in fuzzs:
+                for single_char in single_chars:
+                    for neighborhood_fn in neighborhood_fns:
+                        args = (
+                            f"experiments/3D/tile{str(tile_shape)}:seed{str(seed_vals)}:fuzz{str(fuzz)}:single_char{str(single_char)}:{str(neighborhood_fn.__name__)}:{time.time()}",
+                            "solutions",
+                            level_range,
+                            gen_shape,
+                            tile_shape,
+                            num_levels,
+                            max_num_trials,
+                            seed_vals,
+                            fuzz,
+                            single_char,
+                            neighborhood_fn,
+                        )
+                        arg_combos.append(args)
+
+    with multiprocessing.Pool() as pool:
+        pool.starmap(train_generate_3D, arg_combos)
 
     # gen_shape = (6, 10)
     # tile_shape = (3, 2)

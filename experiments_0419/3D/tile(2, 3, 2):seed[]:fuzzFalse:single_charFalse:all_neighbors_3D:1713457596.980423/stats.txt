@@ -1,0 +1,15 @@
+3D trials
+retry x 10
+seeded with []
+trained on ['A', 1, 2, 3, 4]
+generation shape (5, 7, 10)
+tile shape (2, 3, 2)
+fuzz? False
+single char? False
+complete levels 10/10
+elapsed time 938.7821619510651
+avg num trials: 2.4
+avg num samples: 6.1
+neighborhood: all_neighbors_3D
+
+results: all "blank"

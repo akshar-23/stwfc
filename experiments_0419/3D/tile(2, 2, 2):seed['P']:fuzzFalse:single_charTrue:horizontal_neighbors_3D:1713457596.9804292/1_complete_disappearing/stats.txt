@@ -1,0 +1,3 @@
+Num trials: 7/10
+Num samples: 30
+Elapsed: 361.8702850341797
