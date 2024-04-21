@@ -1,0 +1,13 @@
+3D trials
+retry x 1
+seeded with (<function seed_t0 at 0x11fe9d940>, [])
+trained on ['A']
+generation shape (4, 4, 8)
+tile shape (2, 2, 2)
+fuzz? False
+single char? True
+complete levels 1/1
+elapsed time 55.06554102897644
+avg num trials: 1.0
+avg num samples: 120.0
+neighborhood: orthogonal_neighbors_3D

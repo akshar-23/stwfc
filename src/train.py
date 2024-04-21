@@ -5,74 +5,120 @@ import os
 import json
 
 
-def str_to_lvl(str):
+def str_to_board(str):
     rows = str.split("\n")
     return np.array(list(map(list, rows)))
 
 
-def lvl_to_str(lvl):
+def board_to_str(lvl):
     lvl_str = ""
     for row in lvl:
         row_str = "".join(row)
         lvl_str += row_str + "\n"
-    return lvl_str
+    return lvl_str[:-1]  # trim final \n
 
 
-def get_pad_value_2D(tile_shape, pad_char="X"):
-    pad_value = ""
-    for _ in range(np.prod(tile_shape)):
-        pad_value += pad_char
-    return pad_value
+def test_str_to_from_board():
+    print("Test str_to_board")
+    board_str = "ABC\nDEF\nGHI"
+    board = str_to_board(board_str)
+    expected = np.array([["A", "B", "C"], ["D", "E", "F"], ["G", "H", "I"]])
+    assert np.array_equal(board, expected), f"{board} != {expected}"
+
+    print("Test board_to_str")
+    back_to_str = board_to_str(board)
+    assert back_to_str == board_str, f"{back_to_str} != {board_str}"
 
 
-def get_pad_value_3D(tile_shape, pad_char="X"):
-    pad_value = ""
-
-    for _ in range(np.prod(tile_shape)):
-        pad_value += pad_char
-    return pad_value
-
-
-def pad_3D(grid, tile_shape=(1, 1, 1), width=1):
-    pad_value = get_pad_value_3D(tile_shape)
-    return np.pad(grid, pad_width=width, constant_values=pad_value)
+def pad(grid, tile_shape=(1, 1, 1), pad_value="X"):
+    pad_width = []
+    for dim_width in tile_shape:
+        pad_width.append((dim_width, dim_width))
+    return np.pad(grid, pad_width=tuple(pad_width), constant_values=pad_value)
 
 
-def unpad_3D(grid, pad_width=1):
-    return grid[pad_width:-pad_width, pad_width:-pad_width, pad_width:-pad_width]
+def unpad_3D(grid, tile_shape=(1, 1, 1)):
+    return grid[
+        tile_shape[0] : -tile_shape[0],
+        tile_shape[1] : -tile_shape[1],
+        tile_shape[2] : -tile_shape[2],
+    ]
 
 
-def unpad_2D(grid, pad_width=1):
-    return grid[pad_width:-pad_width, pad_width:-pad_width]
+def test_padding():
+    print("Test pad")
+    grid = np.array(
+        [
+            [
+                ["A", "B", "C"],
+                ["D", "E", "F"],
+            ],
+            [
+                ["G", "H", "I"],
+                ["J", "K", "L"],
+            ],
+        ],
+    )
+    padded = pad(grid)
+
+    expected = np.array(
+        [
+            [
+                ["X", "X", "X", "X", "X"],
+                ["X", "X", "X", "X", "X"],
+                ["X", "X", "X", "X", "X"],
+                ["X", "X", "X", "X", "X"],
+            ],
+            [
+                ["X", "X", "X", "X", "X"],
+                ["X", "A", "B", "C", "X"],
+                ["X", "D", "E", "F", "X"],
+                ["X", "X", "X", "X", "X"],
+            ],
+            [
+                ["X", "X", "X", "X", "X"],
+                ["X", "G", "H", "I", "X"],
+                ["X", "J", "K", "L", "X"],
+                ["X", "X", "X", "X", "X"],
+            ],
+            [
+                ["X", "X", "X", "X", "X"],
+                ["X", "X", "X", "X", "X"],
+                ["X", "X", "X", "X", "X"],
+                ["X", "X", "X", "X", "X"],
+            ],
+        ],
+    )
+
+    assert np.array_equal(padded, expected), f"{padded} != {expected}"
+
+    print("Test unpad_3D")
+    unpadded = unpad_3D(padded)
+    assert np.array_equal(unpadded, grid), f"{unpadded} != {grid}"
 
 
-def pad_2D(grid, tile_shape=(1, 1), width=1):
-    pad_value = get_pad_value_2D(tile_shape)
-    return np.pad(grid, pad_width=width, constant_values=pad_value)
+def islistlike(obj):
+    return isinstance(obj, list) or isinstance(obj, np.ndarray)
 
 
-def context_key(neighbors):
-    key = ""
-    for n in neighbors:
-        key += n
-    return key
+def tuplify(listlike):
+    if islistlike(listlike[0]):
+        return tuple(tuplify(x) for x in listlike)
+    return tuple(listlike)
 
 
-def key_to_arr(key):
-    return list(key)
+def test_tuplify():
+    print("Test tuple_of_tuples")
+    og_list_of_lists_of_lists = np.array([
+        [["A", "B", "C"], ["D", "E", "F"]],
+        [["G", "H", "I"], ["J", "K", "L"]],
+    ])
+    expected = ((("A", "B", "C"), ("D", "E", "F")), (("G", "H", "I"), ("J", "K", "L")))
+    actual = tuplify(og_list_of_lists_of_lists)
+    assert expected == actual, f"{actual} != {expected}"
 
 
-def all_neighbors_2D(L, pos):
-    _, I, J = pos
-    neighbors = []
-
-    for i in range(I - 1, I + 2):
-        for j in range(J - 1, J + 2):
-            if (i != I or j != J) and (i == I or j == J):
-                neighbors.append(L[0, i, j])
-    return neighbors
-
-
+# above, below, left, right, diagonals, center through time
 def all_neighbors_3D(L, idx):
     K, I, J = idx
     neighbors = []
@@ -82,9 +128,23 @@ def all_neighbors_3D(L, idx):
             for j in range(J - 1, J + 2):
                 if k != K or i != I or j != J:
                     neighbors.append(L[k, i, j])
-    return neighbors
+    return np.array(neighbors)
 
 
+# above, below, left, right, center through time
+def orthogonal_neighbors_3D(L, idx):
+    K, I, J = idx
+    neighbors = []
+
+    for k in range(K - 1, K + 2):
+        for i in range(I - 1, I + 2):
+            for j in range(J - 1, J + 2):
+                if (k != K or i != I or j != J) and (i == I or j == J):
+                    neighbors.append(L[k, i, j])
+    return np.array(neighbors)
+
+
+# left, right, center through time
 def horizontal_neighbors_3D(L, idx):
     K, I, J = idx
     neighbors = []
@@ -93,307 +153,93 @@ def horizontal_neighbors_3D(L, idx):
         for j in range(J - 1, J + 2):
             if k != K or j != J:
                 neighbors.append(L[k, I, j])
-    return neighbors
+    return np.array(neighbors)
 
 
-def train_3D_naive(levels, tile_shape, neighborhood_fn=all_neighbors_3D):
-    tile_counts = {}
-    full_context_counts = {}
-    for L in levels:
-        L = pad_3D(L, tile_shape)
-        K, I, J = L.shape
-        for k in range(1, K - 1):
-            for i in range(1, I - 1):
-                for j in range(1, J - 1):
-                    t = L[k, i, j]
-                    if t not in tile_counts:
-                        tile_counts[t] = 0
-                    tile_counts[t] += 1
-                    fc = context_key(neighborhood_fn(L, (k, i, j)))
-                    if fc not in full_context_counts:
-                        full_context_counts[fc] = {}
-                    if t not in full_context_counts[fc]:
-                        full_context_counts[fc][t] = 0
-                    full_context_counts[fc][t] += 1
-
-    tile_distribution = {}
-    full_context_distribution = {}
-
-    tile_distribution = normalize(tile_counts)
-
-    for c, counts in full_context_counts.items():
-        full_context_distribution[c] = normalize(counts)
-
-    return (
-        tile_distribution,
-        tile_counts,
-        full_context_distribution,
-        full_context_counts,
+def test_neighbors():
+    grid = np.array(
+        [
+            [
+                ["0", "1", "2"],
+                ["A", "B", "C"],
+                ["D", "E", "F"],
+            ],
+            [
+                ["3", "4", "5"],
+                ["G", "H", "I"],
+                ["J", "K", "L"],
+            ],
+            [
+                ["6", "7", "8"],
+                ["M", "N", "O"],
+                ["P", "Q", "R"],
+            ],
+        ],
     )
 
+    print("Test all_neighbors_3D")
+    expected = [
+        "0",
+        "1",
+        "2",
+        "A",
+        "B",
+        "C",
+        "D",
+        "E",
+        "F",
+        "3",
+        "4",
+        "5",
+        "G",
+        "I",
+        "J",
+        "K",
+        "L",
+        "6",
+        "7",
+        "8",
+        "M",
+        "N",
+        "O",
+        "P",
+        "Q",
+        "R",
+    ]
+    actual = all_neighbors_3D(grid, (1, 1, 1))
+    assert np.array_equal(expected, actual), f"{actual} != {expected}"
 
-def train_3D(solutions, tile_size=1):
-    # For each change, track also how neighbors change.
-    # Then in generation, can select which neighbor to move to to gen next.
-    transitions = {}
-    for soln in solutions:
-        I = len(soln[0])
-        J = len(soln[0][0])
-        for i in range(I):
-            for j in range(J):
-                # For each tile in space
-                tile_prev = None
-                for t in range(len(soln)):
-                    # For each timestep
-                    tile_curr = soln[t][i][j]
-                    if tile_curr not in transitions:
-                        transitions[tile_curr] = {
-                            "prev": [],
-                            "next": [],
-                        }
-                    if tile_curr != tile_prev:
-                        # Add the tile at the previous timestep to the list of tiles that can precede this tile.
-                        transitions[tile_curr]["prev"].append(tile_prev)
-                        if tile_prev is not None:
-                            # Add this tile to the list of tiles that can follow its preceding tile.
-                            transitions[tile_prev]["next"].append(tile_curr)
-                    tile_prev = tile_curr
-                    if t == len(soln) - 1:
-                        # This is the last step in the solution.
-                        transitions[tile_curr]["next"].append(None)
+    print("Test orthogonal_neighbors_3D")
+    expected = ["1", "A", "B", "C", "E", "4", "G", "I", "K", "7", "M", "N", "O", "Q"]
+    actual = orthogonal_neighbors_3D(grid, (1, 1, 1))
+    assert np.array_equal(expected, actual), f"{actual} != {expected}"
 
-    return transitions
-
-
-def train_2D(levels, tile_shape=(1, 1), neighbor_fn=all_neighbors_2D):
-
-    tile_counts = {}
-    full_context_counts = {}
-    for L in levels:
-        L = pad_2D(L, tile_shape)
-        I, J = L.shape
-        for i in range(1, I - 1):
-            for j in range(1, J - 1):
-                t = L[i, j]
-                if t not in tile_counts:
-                    tile_counts[t] = 0
-                tile_counts[t] += 1
-                fc = context_key(neighbor_fn(L, (i, j)))
-                if fc not in full_context_counts:
-                    full_context_counts[fc] = {}
-                if t not in full_context_counts[fc]:
-                    full_context_counts[fc][t] = 0
-                full_context_counts[fc][t] += 1
-
-    tile_distribution = {}
-    full_context_distribution = {}
-
-    tile_distribution = normalize(tile_counts)
-
-    for c, counts in full_context_counts.items():
-        full_context_distribution[c] = normalize(counts)
-
-    return (
-        tile_distribution,
-        tile_counts,
-        full_context_distribution,
-        full_context_counts,
-    )
+    print("Test horizontal_neighbors_3D")
+    expected = ["A", "B", "C", "G", "I", "M", "N", "O"]
+    actual = horizontal_neighbors_3D(grid, (1, 1, 1))
+    assert np.array_equal(expected, actual), f"{actual} != {expected}"
 
 
 def normalize(counts):
     distribution = {}
     total = sum(counts.values())
-    for t, count in counts.items():
-        distribution[t] = count / total
+    for key, count in counts.items():
+        distribution[key] = count / total
     return distribution
 
 
-def decode_tiles_2D(level, tile_shape, overlapping=True):
-    I, J = level.shape
+def test_normalize():
+    print("Test normalize")
+    counts = {"A": 7, "B": 2, "C": 1}
 
-    # Final decoded level size
-    Id = 0
-    Jd = 0
+    expected = {
+        "A": 0.7,
+        "B": 0.2,
+        "C": 0.1,
+    }
 
-    ishape, jshape = tile_shape
-    if overlapping:
-        Id = I + (ishape - 1)
-        Jd = J + (jshape - 1)
-    else:
-        Id = I * ishape
-        Jd = J * jshape
-
-    # Fill an empty array with empty values
-    L = np.full((Id, Jd), ".")
-    for i in range(I):
-        for j in range(J):
-            tiles = np.array(list(level[i, j]))
-
-            start_i = 0
-            start_j = 0
-            if overlapping:
-                start_i = i
-                start_j = j
-            else:
-                start_i = i * ishape
-                start_j = j * jshape
-
-            ti = 0
-            for li in range(start_i, start_i + ishape):
-                for lj in range(start_j, start_j + jshape):
-                    if L[li, lj] != "." and tiles[ti] != "." and L[li, lj] != tiles[ti]:
-                        raise Exception("SOMETHING IS HORRIBLY BROKEN")
-                    if tiles[ti] != ".":
-                        L[li, lj] = tiles[ti]
-                    ti += 1
-    return L
-
-
-def decode_tiles_3D(level, tile_shape, overlapping=True):
-    K, I, J = level.shape
-
-    # Final decoded level size
-    Kd = 0
-    Id = 0
-    Jd = 0
-
-    kshape, ishape, jshape = tile_shape
-    if overlapping:
-        Kd = K + (kshape - 1)
-        Id = I + (ishape - 1)
-        Jd = J + (jshape - 1)
-    else:
-        Kd = K * kshape
-        Id = I * ishape
-        Jd = J * jshape
-
-    # Fill an empty array with empty values
-    L = np.full((Kd, Id, Jd), ".")
-    for k in range(K):
-        for i in range(I):
-            for j in range(J):
-                tiles = np.array(list(level[k, i, j]))
-
-                start_k = 0
-                start_i = 0
-                start_j = 0
-                if overlapping:
-                    start_k = k
-                    start_i = i
-                    start_j = j
-                else:
-                    start_k = k * tile_shape[0]
-                    start_i = i * tile_shape[1]
-                    start_j = j * tile_shape[2]
-
-                ti = 0
-                for ki in range(start_k, start_k + tile_shape[0]):
-                    for li in range(start_i, start_i + tile_shape[1]):
-                        for lj in range(start_j, start_j + tile_shape[2]):
-                            if (
-                                L[ki, li, lj] != "."
-                                and tiles[ti] != "."
-                                and L[ki, li, lj] != tiles[ti]
-                            ):
-                                raise Exception("SOMETHING IS HORRIBLY BROKEN")
-                            if tiles[ti] != ".":
-                                L[ki, li, lj] = tiles[ti]
-                            ti += 1
-    return L
-
-
-def encode_tiles_2D(level, tile_shape, overlapping=True):
-    I, J = level.shape
-
-    # Final encoded level size
-    Ie = 0
-    Je = 0
-    ishape, jshape = tile_shape
-    if overlapping:
-        Ie = I - (ishape - 1)
-        Je = J - (jshape - 1)
-    else:
-        Ie = math.ceil(I / ishape)
-        Je = math.ceil(J / jshape)
-
-    # Fill an empty array with tiles of the appropriate size
-    encoding = np.full((Ie, Je), get_pad_value_3D(tile_shape))
-
-    # Encode the level with tilesize x tilesize groups
-    for ie in range(Ie):
-        for je in range(Je):
-            istep = 0
-            jstep = 0
-            if overlapping:
-                istep = 1
-                jstep = 1
-            else:
-                istep = ishape
-                jstep = jshape
-            i = ie * istep + (ishape - 1)
-            j = je * jstep + (jshape - 1)
-            tile_key = ""
-            for li in range(i - (ishape - 1), i + 1):
-                for lj in range(j - (jshape - 1), j + 1):
-                    if li > I - 1 or lj > J - 1:
-                        # The level doesn't divide evenly by the tile size; insert wall tiles to make up.
-                        tile_key += "W"
-                    else:
-                        tile_key += level[li, lj]
-            encoding[ie, je] = tile_key
-    return encoding
-
-
-def encode_tiles_3D(level, tile_shape, overlapping=True):
-    K, I, J = level.shape
-
-    # Final encoded level size
-    Ke = 0
-    Ie = 0
-    Je = 0
-    if overlapping:
-        Ke = K - (tile_shape[0] - 1)
-        Ie = I - (tile_shape[1] - 1)
-        Je = J - (tile_shape[2] - 1)
-    else:
-        Ke = math.ceil(K / tile_shape[0])
-        Ie = math.ceil(I / tile_shape[1])
-        Je = math.ceil(J / tile_shape[2])
-
-    # Fill an empty array with tiles of the appropriate size
-    encoding = np.full((Ke, Ie, Je), get_pad_value_3D(tile_shape))
-
-    # Encode the level with tilesize x tilesize groups
-    for ke in range(Ke):
-        for ie in range(Ie):
-            for je in range(Je):
-                kshape, ishape, jshape = tile_shape
-                kstep = 0
-                istep = 0
-                jstep = 0
-                if overlapping:
-                    kstep = 1
-                    istep = 1
-                    jstep = 1
-                else:
-                    kstep = kshape
-                    istep = ishape
-                    jstep = jshape
-                k = ke * kstep + (kshape - 1)
-                i = ie * istep + (ishape - 1)
-                j = je * jstep + (jshape - 1)
-                tile_key = ""
-                for lk in range(k - (kshape - 1), k + 1):
-                    for li in range(i - (ishape - 1), i + 1):
-                        for lj in range(j - (jshape - 1), j + 1):
-                            if lk > K - 1 or li > I - 1 or lj > J - 1:
-                                # The level doesn't divide evenly by the tile size; insert wall tiles to make up.
-                                tile_key += "W"
-                            else:
-                                tile_key += level[lk, li, lj]
-                encoding[ke, ie, je] = tile_key
-    return encoding
+    actual = normalize(counts)
+    assert actual == expected, f"{actual} != {expected}"
 
 
 def flip_over_vertical(board):
@@ -410,48 +256,417 @@ def flip_soln(solution):
     return np.array(flipped_soln)
 
 
+def test_flip():
+    print("Test flip_soln and flip_over_vertical")
+
+    grid = np.array(
+        [
+            [
+                ["A", "B", "C"],
+                ["D", "E", "F"],
+            ],
+            [["G", "H", "I"], ["J", "K", "L"]],
+        ],
+    )
+
+    expected = np.array(
+        [
+            [
+                ["C", "B", "A"],
+                ["F", "E", "D"],
+            ],
+            [
+                ["I", "H", "G"],
+                ["L", "K", "J"],
+            ],
+        ],
+    )
+
+    actual = flip_soln(grid)
+    assert np.array_equal(actual, expected), f"{actual} != {expected}"
+
+
+def encode_tiles_3D(L, tile_shape):
+    K, I, J = L.shape
+    Kt, It, Jt = tile_shape
+
+    # Final encoded level size
+    Ke = K - (Kt - 1)
+    Ie = I - (It - 1)
+    Je = J - (Jt - 1)
+
+    # Fill an empty array with tiles of the appropriate size
+    Le = np.full((Ke, Ie, Je, Kt, It, Jt), "#####")
+
+    # Encode the level with tile_shape groups
+    for ke in range(Ke):
+        for ie in range(Ie):
+            for je in range(Je):
+                for kt in range(Kt):
+                    for it in range(It):
+                        for jt in range(Jt):
+                            Le[ke, ie, je, kt, it, jt] = L[ke + kt, ie + it, je + jt]
+
+    return Le
+
+
+def decode_tiles_3D(Le, options=False, options_all="PDB_W"):
+    Ke, Ie, Je, Kt, It, Jt = Le.shape
+
+    # Final decoded level size
+    K = Ke + (Kt - 1)
+    I = Ie + (It - 1)
+    J = Je + (Jt - 1)
+
+    # Fill an empty array with empty values
+    empty_val = "."
+    if options:
+        empty_val = "".join(sorted(list(options_all)))
+    L = np.full((K, I, J), empty_val)
+
+    for Leidx in np.ndindex(Le.shape):
+        ke, ie, je, kt, it, jt = Leidx
+        Lidx = ke + kt, ie + it, je + jt
+        Lt = L[Lidx]
+        Let = Le[Leidx]
+        if options:
+            L[Lidx] = "".join(
+                sorted(list(set(list(Lt)).intersection(list(Let))))
+            ).strip()
+        else:
+            if Lt != "." and Let != "." and Lt != Let:
+                raise Exception(f"{Let} != {Lt}")
+            L[Lidx] = Let
+
+    return L
+
+
+def test_encode_decode():
+    grid = np.array(
+        [
+            [
+                ["XXX", "X", "X"],
+                ["X", "X", "X"],
+                ["X", "X", "X"],
+                ["X", "X", "X"],
+            ],
+            [
+                ["X", "X", "X"],
+                ["X", ".", "B"],
+                ["X", "D", "E"],
+                ["X", "X", "X"],
+            ],
+            [
+                ["X", "X", "X"],
+                ["X", "G", "H"],
+                ["X", "J", "K"],
+                ["X", "X", "X"],
+            ],
+        ],
+    )
+    print("Test encode_tiles_3D")
+    expected_encoding = np.array([
+        [
+            [
+                [
+                    [
+                        ["X", "X"],
+                        ["X", "X"],
+                        ["X", "X"],
+                    ],
+                    [
+                        ["X", "X"],
+                        ["X", "."],
+                        ["X", "D"],
+                    ],
+                ],
+                [
+                    [
+                        ["X", "X"],
+                        ["X", "X"],
+                        ["X", "X"],
+                    ],
+                    [
+                        ["X", "X"],
+                        [".", "B"],
+                        ["D", "E"],
+                    ],
+                ],
+            ],
+            [
+                [
+                    [
+                        ["X", "X"],
+                        ["X", "X"],
+                        ["X", "X"],
+                    ],
+                    [
+                        ["X", "."],
+                        ["X", "D"],
+                        ["X", "X"],
+                    ],
+                ],
+                [
+                    [
+                        ["X", "X"],
+                        ["X", "X"],
+                        ["X", "X"],
+                    ],
+                    [
+                        [".", "B"],
+                        ["D", "E"],
+                        ["X", "X"],
+                    ],
+                ],
+            ],
+        ],
+        [
+            [
+                [
+                    [
+                        ["X", "X"],
+                        ["X", "."],
+                        ["X", "D"],
+                    ],
+                    [
+                        ["X", "X"],
+                        ["X", "G"],
+                        ["X", "J"],
+                    ],
+                ],
+                [
+                    [
+                        ["X", "X"],
+                        [".", "B"],
+                        ["D", "E"],
+                    ],
+                    [
+                        ["X", "X"],
+                        ["G", "H"],
+                        ["J", "K"],
+                    ],
+                ],
+            ],
+            [
+                [
+                    [
+                        ["X", "."],
+                        ["X", "D"],
+                        ["X", "X"],
+                    ],
+                    [
+                        ["X", "G"],
+                        ["X", "J"],
+                        ["X", "X"],
+                    ],
+                ],
+                [
+                    [
+                        [".", "B"],
+                        ["D", "E"],
+                        ["X", "X"],
+                    ],
+                    [
+                        ["G", "H"],
+                        ["J", "K"],
+                        ["X", "X"],
+                    ],
+                ],
+            ],
+        ],
+    ])
+    grid[0][0][0] = "X"
+    encoded = encode_tiles_3D(grid, (2, 3, 2))
+    assert np.array_equal(
+        encoded, expected_encoding
+    ), f"{encoded} != {expected_encoding}"
+
+    print("Test decode_tiles_3D")
+    expected_decoding = grid
+    decoded = decode_tiles_3D(encoded)
+    assert np.array_equal(
+        decoded, expected_decoding
+    ), f"{decoded} != {expected_decoding}"
+
+    print("Test options")
+    grid[0][0][1] = "XYZ"
+    encoded = encode_tiles_3D(grid, (2, 3, 2))
+    assert encoded[0][0][0][0][0][1] == "XYZ"
+    assert encoded[0][0][1][0][0][0] == "XYZ"
+    encoded[0][0][1][0][0][0] = "XY"
+    decoded = decode_tiles_3D(encoded, True, options_all="ABCDEFGHIJKLMNOPQRSTUVWXYZ.")
+    assert decoded[0][0][1] == "XY"
+
+
+def train_3D(levels, tile_shape, neighborhood_fn=all_neighbors_3D):
+    tile_counts = {}
+    neighborhood_counts = {}
+    for L in levels:
+        Lp = pad(L, tile_shape)
+        Lpe = encode_tiles_3D(Lp, tile_shape)
+        K, I, J, Kt, It, Jt = Lpe.shape
+        for k in range(1, K - 1):
+            for i in range(1, I - 1):
+                for j in range(1, J - 1):
+                    T = tuplify(Lpe[k, i, j])
+                    if T not in tile_counts:
+                        tile_counts[T] = 0
+                    tile_counts[T] += 1
+                    N = tuplify(neighborhood_fn(Lpe, (k, i, j)))
+                    if N not in neighborhood_counts:
+                        neighborhood_counts[N] = {}
+                    if T not in neighborhood_counts[N]:
+                        neighborhood_counts[N][T] = 0
+                    neighborhood_counts[N][T] += 1
+
+    return (
+        tile_counts,
+        neighborhood_counts,
+    )
+
+
+def test_train():
+    print("Test train_3D")
+    L = np.array(
+        [
+            [
+                ["A", "B", "C"],
+                ["D", "E", "F"],
+                ["G", "H", "I"],
+            ],
+            [
+                ["J", "K", "L"],
+                ["M", "N", "O"],
+                ["P", "Q", "R"],
+            ],
+        ],
+    )
+    tile_counts, neighborhood_counts = train_3D([L], (2, 3, 2))
+
+    tile = ((("A", "B"), ("D", "E"), ("G", "H")), (("J", "K"), ("M", "N"), ("P", "Q")))
+    assert tile_counts[tile] == 1
+
+    neighborhood = (
+        (
+            (("X", "X"), ("X", "X"), ("X", "X")),
+            (("X", "X"), ("X", "A"), ("X", "D")),
+        ),
+        (
+            (("X", "X"), ("X", "X"), ("X", "X")),
+            (("X", "X"), ("A", "B"), ("D", "E")),
+        ),
+        (
+            (("X", "X"), ("X", "X"), ("X", "X")),
+            (("X", "X"), ("B", "C"), ("E", "F")),
+        ),
+        (
+            (("X", "X"), ("X", "X"), ("X", "X")),
+            (("X", "A"), ("X", "D"), ("X", "G")),
+        ),
+        (
+            (("X", "X"), ("X", "X"), ("X", "X")),
+            (("A", "B"), ("D", "E"), ("G", "H")),
+        ),
+        (
+            (("X", "X"), ("X", "X"), ("X", "X")),
+            (("B", "C"), ("E", "F"), ("H", "I")),
+        ),
+        (
+            (("X", "X"), ("X", "X"), ("X", "X")),
+            (("X", "D"), ("X", "G"), ("X", "X")),
+        ),
+        (
+            (("X", "X"), ("X", "X"), ("X", "X")),
+            (("D", "E"), ("G", "H"), ("X", "X")),
+        ),
+        (
+            (("X", "X"), ("X", "X"), ("X", "X")),
+            (("E", "F"), ("H", "I"), ("X", "X")),
+        ),
+        (
+            (("X", "X"), ("X", "A"), ("X", "D")),
+            (("X", "X"), ("X", "J"), ("X", "M")),
+        ),
+        (
+            (("X", "X"), ("A", "B"), ("D", "E")),
+            (("X", "X"), ("J", "K"), ("M", "N")),
+        ),
+        (
+            (("X", "X"), ("B", "C"), ("E", "F")),
+            (("X", "X"), ("K", "L"), ("N", "O")),
+        ),
+        (
+            (("X", "A"), ("X", "D"), ("X", "G")),
+            (("X", "J"), ("X", "M"), ("X", "P")),
+        ),
+        (
+            (("B", "C"), ("E", "F"), ("H", "I")),
+            (("K", "L"), ("N", "O"), ("Q", "R")),
+        ),
+        (
+            (("X", "D"), ("X", "G"), ("X", "X")),
+            (("X", "M"), ("X", "P"), ("X", "X")),
+        ),
+        (
+            (("D", "E"), ("G", "H"), ("X", "X")),
+            (("M", "N"), ("P", "Q"), ("X", "X")),
+        ),
+        (
+            (("E", "F"), ("H", "I"), ("X", "X")),
+            (("N", "O"), ("Q", "R"), ("X", "X")),
+        ),
+        (
+            (("X", "X"), ("X", "J"), ("X", "M")),
+            (("X", "X"), ("X", "X"), ("X", "X")),
+        ),
+        (
+            (("X", "X"), ("J", "K"), ("M", "N")),
+            (("X", "X"), ("X", "X"), ("X", "X")),
+        ),
+        (
+            (("X", "X"), ("K", "L"), ("N", "O")),
+            (("X", "X"), ("X", "X"), ("X", "X")),
+        ),
+        (
+            (("X", "J"), ("X", "M"), ("X", "P")),
+            (("X", "X"), ("X", "X"), ("X", "X")),
+        ),
+        (
+            (("J", "K"), ("M", "N"), ("P", "Q")),
+            (("X", "X"), ("X", "X"), ("X", "X")),
+        ),
+        (
+            (("K", "L"), ("N", "O"), ("Q", "R")),
+            (("X", "X"), ("X", "X"), ("X", "X")),
+        ),
+        (
+            (("X", "M"), ("X", "P"), ("X", "X")),
+            (("X", "X"), ("X", "X"), ("X", "X")),
+        ),
+        (
+            (("M", "N"), ("P", "Q"), ("X", "X")),
+            (("X", "X"), ("X", "X"), ("X", "X")),
+        ),
+        (
+            (("N", "O"), ("Q", "R"), ("X", "X")),
+            (("X", "X"), ("X", "X"), ("X", "X")),
+        ),
+    )
+
+    assert neighborhood_counts[neighborhood][tile] == 1
+    assert len(neighborhood_counts[neighborhood]) == 1
+
+
+def test():
+    test_str_to_from_board()
+    test_padding()
+    test_tuplify()
+    test_neighbors()
+    test_normalize()
+    test_flip()
+    test_encode_decode()
+    test_train()
+
+
 if __name__ == "__main__":
-    tile_size = 2
-
-    solutions = []
-    solutions_folder = os.path.join("src", "solutions")
-    for filename in os.listdir(solutions_folder):
-        if filename.endswith("solution.json"):
-            with open(os.path.join(solutions_folder, filename)) as soln_file:
-                solutions.append(json.load(soln_file))
-
-    encoded_solutions = []
-    for solution in solutions:
-        encoded_soln = []
-        flipped_soln = []
-        for board in solution:
-            encoded_board = encode_tiles(np.array(board), tile_size)
-            encoded_soln.append(encoded_board)
-            flipped_soln.append(flip_over_vertical(encoded_board))
-        encoded_solutions.append(encoded_soln)
-        encoded_solutions.append(flipped_soln)
-
-    transitions = train_3D(encoded_solutions)
-    print(transitions)
-
-    # levels = []
-    # for level in TRAIN_LEVELS:
-    #     unrolled_level = str_to_lvl(level)
-    #     encoded_level = encode_tiles(unrolled_level, tile_size)
-    #     levels.append(encoded_level)
-    #     print(level)
-    #     print(unrolled_level)
-    #     print(encoded_level)
-
-    # (
-    #     tile_distribution,
-    #     full_context_distribution,
-    #     full_context_counts,
-    # ) = train(levels, tile_size)
-
-    # # print("Tile Distribution")
-    # # print(tile_distribution)
-    # print("Context Distribution")
-    # print(full_context_distribution)
-    # print("Context Counts")
-    # print(full_context_counts)
+    test()

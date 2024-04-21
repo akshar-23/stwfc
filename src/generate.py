@@ -1,25 +1,15 @@
 from src.train_levels import TRAIN_LEVELS
 from src.train import (
-    str_to_lvl,
-    lvl_to_str,
-    pad_2D,
-    pad_3D,
-    unpad_2D,
+    board_to_str,
+    pad,
     unpad_3D,
-    get_pad_value_2D,
-    get_pad_value_3D,
-    encode_tiles_2D,
     encode_tiles_3D,
-    train_2D,
-    train_3D_naive,
+    train_3D,
     flip_soln,
-    flip_over_vertical,
-    all_neighbors_2D,
     all_neighbors_3D,
+    orthogonal_neighbors_3D,
     horizontal_neighbors_3D,
     normalize,
-    context_key,
-    decode_tiles_2D,
     decode_tiles_3D,
 )
 import numpy as np
@@ -43,173 +33,104 @@ def sample(distribution):
             return x
 
 
-def log_likelihood(context_distribution, L):
-    I, J = L.shape
-    P = 0
-    for i in range(1, I - 1):
-        for j in range(1, J - 1):
-            N = context_key(all_neighbors(L, (i, j)))
-            t = L[i, j]
-            if N not in context_distribution or t not in context_distribution[N]:
-                P += log(0.0001)
-            else:
-                P += log(
-                    context_distribution[context_key(all_neighbors(L, (i, j)))][L[i, j]]
-                )
-    return P
-
-
-def swap_likelihood(context_distribution, L, P0, P1):
-    t0 = L[P0]
-    t1 = L[P1]
-    N0 = context_key(all_neighbors(L, P0))
-    N1 = context_key(all_neighbors(L, P1))
-
-    P = 0
-    if N0 not in context_distribution or t0 not in context_distribution[N0]:
-        P += log(0.001)
-    else:
-        P += log(context_distribution[N0][t0])
-    if N1 not in context_distribution or t1 not in context_distribution[N1]:
-        P += log(0.001)
-    else:
-        P += log(context_distribution[N1][t1])
-    return P
-
-
-def swap(A, p0, p1):
-    v0 = A[p0]
-    A[p0] = A[p1]
-    A[p1] = v0
-    return A
-
-
-def random_map(tile_distribution, size, tile_size):
-    L = pad(np.full(size, get_pad_value(tile_size, "X")), 1, tile_size)
-    I, J = L.shape
-    for i in range(1, I - 1):
-        for j in range(1, J - 1):
-            L[i, j] = sample(tile_distribution)
-    return L
-
-
-def get_distribution(unfinished_level, full_context_counts, tile_size):
-    I, J = unfinished_level.shape
-    distribution = {}
-    for i in range(1, I - 1):
-        for j in range(1, J - 1):
-            if unfinished_level[i, j] == get_pad_value(tile_size, "."):
-                counts = {}
-                n_key = context_key(all_neighbors(unfinished_level, (i, j)))
-                for context, tile_counts in full_context_counts.items():
-                    if re.search(n_key, context) is not None:
-                        for t, count in tile_counts.items():
-                            if t not in counts:
-                                counts[t] = 0
-                            counts[t] += count
-                distribution[(i, j)] = normalize(counts)
-    return distribution
-
-
-def wfc_2D(full_context_counts, level_shape, tile_shape):
-    I, J = level_shape
-    # Initialize with randomly placed P in timestep 0.
-    L = np.full(level_shape, ".")
-    Pi = randrange(1, I - 1)
-    Pj = randrange(1, J - 1)
-    Pidx = (Pi, Pj)
-    L[Pidx] = "P"
-    L[I - 1] = ["W"] * J
-    Le = encode_tiles_2D(L, tile_shape)
-    Lep = pad_2D(Le, tile_shape)
-
-    finished = False
-    while not finished:
-        did_propagate = True
-        while did_propagate:
-            Lep, did_propagate, most_constrained_idx, most_constrained_distro = (
-                propagate_neighbors_2D(Lep, tile_shape, full_context_counts)
-            )
-
-        if most_constrained_distro == {}:
-            finished = True
-        else:
-            tile = sample(most_constrained_distro)
-            Lep[most_constrained_idx] = tile
-            Lep = propagate_overlapping_2D(Lep, tile_shape)
-
-    # Decode
-    Le = unpad_2D(Lep)
-    L = decode_tiles_2D(Le, tile_shape)
-    return L
-
-
-def get_conditional_tile_distribution(tile_counts, regex):
-    counts = {}
-    for tile, count in tile_counts.items():
-        if re.search(regex, tile) is not None:
-            counts[tile] = count
-    return normalize(counts)
-
-
-def propagate_overlapping(Lep, tile_shape):
+def propagate_overlapping_3D(Lpe, tile_shape, options=False):
     # Propagate to neighbors
-    Le = unpad_3D(Lep)
-    L = decode_tiles_3D(Le, tile_shape)
-    Le = encode_tiles_3D(L, tile_shape)
-    Lep = pad_3D(Le, tile_shape)
-    return Lep
+    Lp = decode_tiles_3D(Lpe, options)
+    L = unpad_3D(Lp, tile_shape)
+    Lp = pad(L, tile_shape)
+    Lpe = encode_tiles_3D(Lp, tile_shape)
+    return Lpe
 
 
-def propagate_overlapping_2D(Lep, tile_shape):
-    # Propagate to neighbors
-    Le = unpad_2D(Lep)
-    L = decode_tiles_2D(Le, tile_shape)
-    Le = encode_tiles_2D(L, tile_shape)
-    Lep = pad_2D(Le, tile_shape)
-    return Lep
+def resolve_options(candidates):
+    # Find an options tile that represents all the candidates.
+    collapsed = candidates[0]
+    options = np.full(candidates[0].shape, "     ")
+    for candidate in candidates:
+        for idx in np.ndindex(candidate.shape):
+            if collapsed[idx] != candidate[idx]:
+                collapsed[idx] = "."
+            curr_options = list(options[idx])
+            curr_options.append(candidate[idx])
+            options[idx] = "".join(sorted(list(set(curr_options)))).strip()
+    return collapsed, options
 
 
-def resolve_candidates(tile, candidates):
-    # Find a string that represents all the candidates.
-    res = ""
-    for i in range(len(tile)):
-        char_and = candidates[0][i]
-        for candidate in candidates:
-            if candidate[i] != char_and:
-                char_and = "."
-                break
-        res += char_and
-    return res
+def compatible(options, candidate):
+    for idx in np.ndindex(options.shape):
+        if candidate[idx] not in options[idx]:
+            return False
+    return True
 
 
-def propagate_neighbors(
-    Lep, tile_shape, full_context_counts, fuzz=False, neighborhood_fn=all_neighbors_3D
+def test_compatibility():
+    options = np.array([[["AB", "AB"], ["CD", "CD"]], [["AB", "AB"], ["XY", "XY"]]])
+
+    incompatible = np.array([[["A", "B"], ["C", "D"]], [["E", "F"], ["G", "H"]]])
+    candidates = np.array([
+        [[["A", "B"], ["C", "D"]], [["A", "B"], ["X", "Y"]]],
+        [[["A", "A"], ["D", "C"]], [["B", "B"], ["X", "X"]]],
+    ])
+
+    print("Test compatible")
+    assert not compatible(
+        options, incompatible
+    ), f"{incompatible} found compatible with {options}"
+
+    for candidate in candidates:
+        assert compatible(
+            options, candidate
+        ), f"{candidate} found compatible with {options}"
+
+    print("Test resolve_options")
+    expected_options = np.array(
+        [[["A", "AB"], ["CD", "CD"]], [["AB", "B"], ["X", "XY"]]]
+    )
+    expected_tile = np.array([[["A", "."], [".", "."]], [[".", "B"], ["X", "."]]])
+    actual_tile, actual_options = resolve_options(candidates)
+    assert np.array_equal(
+        expected_tile, actual_tile
+    ), f"{expected_tile} != {actual_tile}"
+    assert np.array_equal(
+        expected_options, actual_options
+    ), f"{expected_options} != {actual_options}"
+
+
+def propagate_neighbors_3D(
+    Lpe,
+    L_options_pe,
+    tile_shape,
+    full_context_counts,
+    fuzz=False,
+    neighborhood_fn=all_neighbors_3D,
 ):
-    K, I, J = Lep.shape
+    K, I, J, Kt, It, Jt = Lpe.shape
     min_distribution = {}
     min_idx = (0, 0, 0)
     min_len = 1000
-    currT = ""
     did_propagate = False
     for k in range(1, K - 1):
         for i in range(1, I - 1):
             for j in range(1, J - 1):
                 idx = (k, i, j)
-                currT = Lep[idx]
+                currT = Lpe[idx]
                 if "." in currT:
+                    currT_options = L_options_pe[idx]
                     counts = {}
                     # Current neighborhood
-                    n_key = context_key(neighborhood_fn(Lep, idx))
+                    neighborhood_options = neighborhood_fn(L_options_pe, idx)
                     for context, tile_counts in full_context_counts.items():
                         for candidate, count in tile_counts.items():
                             # If the candidate tile matches the current tile
-                            if re.search(currT, candidate):
+                            if compatible(currT_options, np.array(candidate)):
                                 if candidate not in counts and fuzz:
                                     # Candidate is compatible but may not be seen in training.
                                     counts[candidate] = 1
                                 # If the candidate neighborhood matches the current neighborhood
-                                if re.search(n_key, context) is not None:
+                                if (
+                                    compatible(neighborhood_options, np.array(context))
+                                    is not None
+                                ):
                                     if candidate not in counts:
                                         counts[candidate] = 0
                                     counts[candidate] += count
@@ -217,56 +138,39 @@ def propagate_neighbors(
                         min_distribution = normalize(counts)
                         min_idx = idx
                     if len(counts) > 0:
-                        resolvedT = resolve_candidates(currT, list(counts.keys()))
-                        if resolvedT != currT:
-                            Lep[idx] = resolvedT
-                            Lep = propagate_overlapping(Lep, tile_shape)
+                        resolvedT, resolvedT_options = resolve_options(
+                            np.array(list(counts.keys()))
+                        )
+                        if not np.array_equal(resolvedT_options, currT_options):
+                            L_options_pe[idx] = resolvedT_options
+                            # Lpe[idx] = resolvedT
+                            # Lpe = propagate_overlapping_3D(Lpe, tile_shape)
+                            L_options_pe = propagate_overlapping_3D(
+                                L_options_pe, tile_shape, True
+                            )
                             did_propagate = True
-    return Lep, did_propagate, min_idx, min_distribution
+    return Lpe, L_options_pe, did_propagate, min_idx, min_distribution
 
 
-def propagate_neighbors_2D(Lep, tile_shape, full_context_counts):
-    I, J = Lep.shape
-    min_distribution = {}
-    min_idx = (0, 0)
-    min_len = 1000
-    currT = ""
-    did_propagate = False
-    for i in range(1, I - 1):
-        for j in range(1, J - 1):
-            idx = (i, j)
-            currT = Lep[idx]
-            if "." in currT:
-                counts = {}
-                # Current neighborhood
-                n_key = context_key(all_neighbors(Lep, idx))
-                for context, tile_counts in full_context_counts.items():
-                    # If the candidate neighborhood matches the current neighborhood
-                    if re.search(n_key, context) is not None:
-                        for candidate, count in tile_counts.items():
-                            # If the candidate tile matches the current tile
-                            if re.search(currT, candidate):
-                                if candidate not in counts:
-                                    counts[candidate] = 0
-                                counts[candidate] += count
-                if len(counts) < min_len:
-                    min_distribution = normalize(counts)
-                    min_idx = idx
-                if len(counts) > 0:
-                    resolvedT = resolve_candidates(currT, list(counts.keys()))
-                    if resolvedT != currT:
-                        Lep[idx] = resolvedT
-                        Lep = propagate_overlapping_2D(Lep, tile_shape)
-                        did_propagate = True
-    return Lep, did_propagate, min_idx, min_distribution
+def seed_t0(L, seed_vals):
+    for s in seed_vals:
+        sk = 0
+        si = randrange(1, I - 1)
+        sj = randrange(1, J - 1)
+        sidx = (sk, si, sj)
+        L[sidx] = s
+    # Bottom row is always "W"
+    K, I, J = L.shape
+    L[0][I - 1] = ["W"] * J
+    return L
 
 
-def wfc_3D_naive(
+def wfc_3D(
     full_context_counts,
     level_shape,
     tile_shape,
     max_num_trials=100,
-    seed_vals=["P"],
+    seed=(seed_t0, ["P"]),
     fuzz=False,
     single_char=True,
     neighborhood_fn=all_neighbors_3D,
@@ -279,172 +183,70 @@ def wfc_3D_naive(
     best_contra_count = 1000
     best_num_samples = 0
     while "." in L and num_trials < max_num_trials:
-        # print(f"--{num_trials}")
         num_samples = 0
         L = np.full(level_shape, ".")
-        for s in seed_vals:
-            sk = 0
-            si = randrange(1, I - 1)
-            sj = randrange(1, J - 1)
-            sidx = (sk, si, sj)
-            L[sidx] = s
+        L_options = np.full(level_shape, "".join(sorted(list("PDB_W"))).strip())
+        seed_fn, seed_vals = seed
+        L = seed_fn(L, seed_vals)
 
-        # Bottom row is always "W"
-        L[0][I - 1] = ["W"] * J
-        Le = encode_tiles_3D(L, tile_shape)
-        Lep = pad_3D(Le, tile_shape)
+        Lp = pad(L, tile_shape)
+        Lpe = encode_tiles_3D(Lp, tile_shape)
+
+        L_options_p = pad(L_options, tile_shape)
+        L_options_pe = encode_tiles_3D(L_options_p, tile_shape)
 
         finished = False
         while not finished:
             did_propagate = True
             while did_propagate:
-                Lep, did_propagate, most_constrained_idx, most_constrained_distro = (
-                    propagate_neighbors(
-                        Lep, tile_shape, full_context_counts, fuzz, neighborhood_fn
-                    )
+                (
+                    Lpe,
+                    L_options_pe,
+                    did_propagate,
+                    most_constrained_idx,
+                    most_constrained_distro,
+                ) = propagate_neighbors_3D(
+                    Lpe,
+                    L_options_pe,
+                    tile_shape,
+                    full_context_counts,
+                    fuzz,
+                    neighborhood_fn,
                 )
 
             if most_constrained_distro == {}:
                 finished = True
             else:
-                tile = sample(most_constrained_distro)
+                tile = np.array(sample(most_constrained_distro))
                 if not single_char:
                     # Set the entire tile at once
-                    Lep[most_constrained_idx] = tile
+                    Lpe[most_constrained_idx] = tile
+                    L_options_pe[most_constrained_idx] = tile
                 else:
                     # set a single tile
-                    set_tile = list(Lep[most_constrained_idx])
-                    for i in range(len(set_tile)):
-                        if set_tile[i] == ".":
-                            set_tile[i] = tile[i]
+                    set_tile = Lpe[most_constrained_idx]
+                    for idx in np.ndindex(set_tile.shape):
+                        if set_tile[idx] == ".":
+                            set_tile[idx] = tile[idx]
+                            L_options_pe[most_constrained_idx][idx] = tile[idx]
                             break
-                    Lep[most_constrained_idx] = "".join(set_tile)
-                Lep = propagate_overlapping(Lep, tile_shape)
+                    Lpe[most_constrained_idx] = set_tile
+
+                Lpe = propagate_overlapping_3D(Lpe, tile_shape)
+                L_options_pe = propagate_overlapping_3D(L_options_pe, tile_shape, True)
                 num_samples += 1
-        Le = unpad_3D(Lep)
-        L = decode_tiles_3D(Le, tile_shape)
+
+        Lp = decode_tiles_3D(Lpe)
+        L = unpad_3D(Lp, tile_shape)
         count_L = np.count_nonzero(L == ".")
         if count_L < best_contra_count:
             best = copy.deepcopy(L)
             best_contra_count = count_L
             best_num_samples = num_samples
         num_trials += 1
-        # print(f"--samples {num_samples}")
 
+    print(best)
     return best, num_trials, best_num_samples
-
-
-def wfc_3D(transitions, path_length, tile_size):
-    # Move forward from P and backwards from D
-    # How to ensure the twain will meet?
-    L = pad_3D(np.full((100, 100), get_pad_value(tile_size, ".")), 1, tile_size)
-    dx = randrange(100)
-    dy = randrange(100)
-    # idx = (dx, dy)
-    # L(dx, dy) = // random tile from start distribution containing "P"
-    #
-    # for t in range(path_length - 1):
-    #   ...
-    #   idx = next path step
-    # generate tile with "D" at the end of the path.
-    while get_pad_value(tile_size, ".") in L:
-        distribution = get_distribution(L, full_context_counts, tile_size)
-        most_constrained = (0, 0)
-        most_constrained_len = 1000
-        most_constrained_distro = {}
-        for index, distro in distribution.items():
-            distro_len = len(distro)
-            if distro_len < most_constrained_len:
-                most_constrained = index
-                most_constrained_len = distro_len
-                most_constrained_distro = distro
-        if most_constrained_distro == {}:
-            break
-        L[most_constrained] = sample(most_constrained_distro)
-    return L
-
-
-def mrf(tile_distribution, context_distribution, size, tile_size, generations):
-    L = random_map(tile_distribution, size, tile_size)
-    I, J = L.shape
-
-    P = log_likelihood(context_distribution, L)
-    Ps = [P]
-    for _ in range(generations):
-        selected = np.pad(np.zeros((I - 2, J - 2)), pad_width=1, constant_values=1)
-        unselected = I * J
-        while unselected >= 2:
-            i0 = randrange(1, I - 1)
-            j0 = randrange(1, J - 1)
-            i1 = randrange(1, I - 1)
-            j1 = randrange(1, J - 1)
-            selected[i0, j0] = 1
-            selected[i1, j1] = 1
-            Pswap = swap_likelihood(context_distribution, L, (i0, j0), (i1, j1))
-            Ltest = swap(L, (i0, j0), (i1, j1))
-            Ptest = swap_likelihood(context_distribution, Ltest, (i0, j0), (i1, j1))
-            p_accept = min(1, exp(Ptest - Pswap))
-            r = random()
-            if r < p_accept:
-                L = Ltest
-            unselected = np.count_nonzero(selected == 0)
-        P = log_likelihood(context_distribution, L)
-        Ps.append(P)
-    return L, Ps
-
-
-def train_generate():
-    tile_size = 2
-
-    # TRAIN_LEVELS = [TRAIN_LEVELS[0]]
-    overlapping_levels = []
-    non_overlapping_levels = []
-    for level in TRAIN_LEVELS:
-        unrolled_level = str_to_lvl(level)
-        encoded_overlapping_level = encode_tiles(unrolled_level, tile_size)
-        encoded_non_overlapping_level = encode_tiles(unrolled_level, tile_size, False)
-        overlapping_levels.append(encoded_overlapping_level)
-        non_overlapping_levels.append(encoded_non_overlapping_level)
-
-    print("Overlap training (WFC)")
-    print(overlapping_levels)
-
-    print("Non overlap training (MRF)")
-    print(non_overlapping_levels)
-    (
-        overlapping_tile_distribution,
-        overlapping_full_context_distribution,
-        overlapping_full_context_counts,
-    ) = train(overlapping_levels, tile_size)
-
-    (
-        non_overlapping_tile_distribution,
-        non_overlapping_full_context_distribution,
-        non_overlapping_full_context_counts,
-    ) = train(non_overlapping_levels, tile_size)
-
-    # print(overlapping_full_context_counts)
-    # print(non_overlapping_full_context_counts)
-    print("MRF")
-    encoded_level, likelihoods = mrf(
-        non_overlapping_tile_distribution,
-        non_overlapping_full_context_distribution,
-        (2, 6),
-        tile_size,
-        100,
-    )
-    print(encoded_level)
-    level = decode_tiles(encoded_level, tile_size, False)
-    print(level)
-    plt.clf()
-    plt.plot(likelihoods)
-    plt.savefig("likelihoods.png")
-
-    print("WFC")
-    encoded_level = wfc(overlapping_full_context_counts, (10, 10), tile_size)
-    print(encoded_level)
-    level = decode_tiles(encoded_level, tile_size)
-    print(level)
 
 
 def train_generate_3D(
@@ -455,24 +257,12 @@ def train_generate_3D(
     tile_shape=(1, 1, 1),
     num_levels=1,
     max_num_trials=100,
-    seed_vals=["P"],
+    seed=(seed_t0, ["P"]),
     fuzz=False,
     single_char=True,
     neighborhood_fn=all_neighbors_3D,
 ):
-    # fdisplay = "solutions_display"
-    # Path(fdisplay).mkdir(parents=True, exist_ok=True)
-    # for s, soln in enumerate(levels):
-    #     fsolndisplay = f"{fdisplay}/level{s}"
-    #     Path(fsolndisplay).mkdir(parents=True, exist_ok=True)
-    #     for b, board in enumerate(soln):
-    #         b_str = str(b)
-    #         while len(b_str) < 3:
-    #             b_str = "0" + b_str
-    #         with open(f"{fsolndisplay}/step{b_str}.lvl", "w", encoding="utf-8") as f:
-    #             f.write(lvl_to_str(board))
     levels = []
-    overlapping_levels = []
     for i in level_range:
         soln_folder = f"src/{solutions_folder}/blockdude_{i}"
         soln_file = Path(f"{soln_folder}/solution.json")
@@ -485,21 +275,22 @@ def train_generate_3D(
             level[level == "B'"] = "B"
             # Remove the last timestep to ensure that P is always present
             level = level[:-1]
+            fdisplay = "solutions_display"
+            Path(fdisplay).mkdir(parents=True, exist_ok=True)
+            fsolndisplay = f"{fdisplay}/level{i}"
+            Path(fsolndisplay).mkdir(parents=True, exist_ok=True)
+            for b, board in enumerate(level):
+                b_str = str(b)
+                while len(b_str) < 3:
+                    b_str = "0" + b_str
+                with open(
+                    f"{fsolndisplay}/step{b_str}.lvl", "w", encoding="utf-8"
+                ) as f:
+                    f.write(board_to_str(board))
 
-        encoded_overlapping_level = encode_tiles_3D(level, tile_shape)
-        overlapping_levels.append(encoded_overlapping_level)
         levels.append(level)
-
-        flipped_level = flip_soln(level)
-        encoded_flipped_level = encode_tiles_3D(flipped_level, tile_shape)
-        overlapping_levels.append(encoded_flipped_level)
         levels.append(flip_soln(level))
-    (
-        tile_distribution,
-        tile_counts,
-        full_context_distribution,
-        full_context_counts,
-    ) = train_3D_naive(overlapping_levels, tile_shape, neighborhood_fn)
+    (tile_counts, neighborhood_counts) = train_3D(levels, tile_shape, neighborhood_fn)
 
     Path(experiment_folder).mkdir(parents=True, exist_ok=True)
     num_complete = 0
@@ -508,12 +299,12 @@ def train_generate_3D(
     aggregate_samples = 0
     for i in range(num_levels):
         start_time = time.time()
-        level, num_trials, num_samples = wfc_3D_naive(
-            full_context_counts,
+        level, num_trials, num_samples = wfc_3D(
+            neighborhood_counts,
             gen_shape,
             tile_shape,
             max_num_trials,
-            seed_vals,
+            seed,
             fuzz,
             single_char,
             neighborhood_fn,
@@ -539,7 +330,7 @@ def train_generate_3D(
             while len(b_str) < 3:
                 b_str = "0" + b_str
             with open(f"{display_folder}/{b_str}.lvl", "w", encoding="utf-8") as f:
-                f.write(lvl_to_str(board))
+                f.write(board_to_str(board))
         if "." not in level:
             num_complete += 1
     total_end = time.time()
@@ -547,7 +338,7 @@ def train_generate_3D(
     with open(f"{experiment_folder}/stats.txt", "w", encoding="utf-8") as f:
         f.write("3D trials")
         f.write(f"\nretry x {max_num_trials}")
-        f.write(f"\nseeded with {seed_vals}")
+        f.write(f"\nseeded with {seed}")
         f.write(f"\ntrained on {level_range}")
         f.write(f"\ngeneration shape {gen_shape}")
         f.write(f"\ntile shape {tile_shape}")
@@ -561,91 +352,56 @@ def train_generate_3D(
     return
 
 
-def train_generate_2D(
-    experiment_folder,
-    solutions_folder,
-    level_range,
-    gen_shape=(5, 5),
-    tile_shape=(1, 1),
-    num_levels=1,
-):
-    levels = []
-    overlapping_levels = []
-    for i in level_range:
-        soln_file = Path(f"src/{solutions_folder}/blockdude_{i}_solution.json")
-        with open(soln_file) as f:
-            # Get only first timestep for 2D generation
-            level = np.array(json.load(f))[0]
-            # Remove LV# row from level
-            if level[0][1] == ".":
-                level = level[1:, :]
-            # Replace B' with B
-            level[level == "B'"] = "B"
-        
-        soln_display_folder = f"src/{solutions_folder}_display/level{i}"
-        Path(display_folder).mkdir(parents=True, exist_ok=True)
-        for b, board in enumerate(level):
-            b_str = str(b)
-            while len(b_str) < 3:
-                b_str = "0" + b_str
-            with open(f"{soln_display_folder}/{b_str}.lvl", "w", encoding="utf-8") as f:
-                f.write(lvl_to_str(board))
+def seed_tn(L, dummy):
+    dk = L.shape[0] - 1
+    di = randrange(1, I - 1)
+    dj = randrange(2, J - 2)
+    didx = (dk, di, dj)
+    L[didx] = "D"
 
-        encoded_overlapping_level = encode_tiles_2D(level, tile_shape)
-        overlapping_levels.append(encoded_overlapping_level)
-        levels.append(level)
+    r = random()
+    pj = dj + 1
+    if r < 0.5:
+        pj = dj - 1
+    L[dk, di, pj] = "P"
 
-        flipped_level = np.array(flip_over_vertical(level))
-        encoded_flipped_level = encode_tiles_2D(flipped_level, tile_shape)
-        overlapping_levels.append(encoded_flipped_level)
-        levels.append(np.array(flip_over_vertical(level)))
-    (
-        tile_distribution,
-        tile_counts,
-        full_context_distribution,
-        full_context_counts,
-    ) = train_2D(overlapping_levels, tile_shape)
-
-    Path(experiment_folder).mkdir(parents=True, exist_ok=True)
-    for i in range(num_levels):
-        level = wfc_2D(
-            full_context_counts,
-            gen_shape,
-            tile_shape,
-        )
-        # print(level)
-        with open(f"{experiment_folder}/{i}.txt", "w", encoding="utf-8") as f:
-            f.write(str(level))
-    return
+    # Bottom row is always "W"
+    K, I, J = L.shape()
+    L[0][I - 1] = ["W"] * J
+    return L
 
 
 if __name__ == "__main__":
-    level_range = ["A", 1, 2, 3, 4]
-    gen_shape = (5, 7, 10)
-    tile_shapes = [(2, 3, 2), (2, 2, 2)]
-    num_levels = 10
-    max_num_trials = 10
-    seed_valss = [["P"], []]
-    fuzzs = [True, False]
-    single_chars = [True, False]
-    neighborhood_fns = [all_neighbors_3D, horizontal_neighbors_3D]
+    level_range = ["A"]  # ["A", 1, 2, 3, 4]
+    gen_shape = (4, 4, 8)  # (5, 7, 10)
+    tile_shapes = [(2, 2, 2)]  # [(2, 3, 2), (2, 2, 2)]
+    num_levels = 1  # 10
+    max_num_trials = 1  # 10
+    seeds = [
+        (seed_t0, [])
+    ]  # [(seed_t0, ["P"]), (seed_t0, []), (seed_t0, ["D"]), (seed_tn, [])]
+    fuzzs = [False]
+    single_chars = [True]
+    neighborhood_fns = [
+        orthogonal_neighbors_3D
+    ]  # [orthogonal_neighbors_3D, horizontal_neighbors_3D]
 
     arg_combos = []
 
     for tile_shape in tile_shapes:
-        for seed_vals in seed_valss:
+        for seed in seeds:
             for fuzz in fuzzs:
                 for single_char in single_chars:
                     for neighborhood_fn in neighborhood_fns:
                         args = (
-                            f"experiments/3D/tile{str(tile_shape)}:seed{str(seed_vals)}:fuzz{str(fuzz)}:single_char{str(single_char)}:{str(neighborhood_fn.__name__)}:{time.time()}",
+                            f"experiments/3D/tile{str(tile_shape)}:seed{str(seed)}:fuzz{str(fuzz)}:single_char{str(single_char)}:{str(neighborhood_fn.__name__)}:{time.time()}",
                             "solutions",
                             level_range,
                             gen_shape,
                             tile_shape,
                             num_levels,
                             max_num_trials,
-                            seed_vals,
+                            seed,
                             fuzz,
                             single_char,
                             neighborhood_fn,
@@ -654,39 +410,3 @@ if __name__ == "__main__":
 
     with multiprocessing.Pool() as pool:
         pool.starmap(train_generate_3D, arg_combos)
-
-    # gen_shape = (6, 10)
-    # tile_shape = (3, 2)
-    # num_levels = 1
-    # train_generate_2D(
-    #     f"experiments_2D_P_seededr{level_range}g{gen_shape}t{tile_shape}",
-    #     "solutions",
-    #     level_range,
-    #     gen_shape,
-    #     tile_shape,
-    #     num_levels,
-    # )
-
-    # tile_size = 2
-    # L = np.array([
-    #     [["A", "B", "C"], ["D", "E", "F"], ["G", "H", "I"]],
-    #     [["J", "K", "L"], ["M", "N", "O"], ["P", "Q", "R"]],
-    #     [["S", "T", "U"], ["V", "W", "X"], ["Y", "Z", "0"]],
-    # ])
-    # print(L)
-
-    # print("Encoded: ")
-    # eL = encode_tiles_3D(L, 2)
-    # print(eL)
-
-    # print("Padded:")
-    # peL = pad_3D(eL, tile_size)
-    # print(peL)
-
-    # print("Unpadded:")
-    # eL = unpad_3D(peL)
-    # print(eL)
-
-    # print("Decoded: ")
-    # L = decode_tiles_3D(eL, 2)
-    # print(L)

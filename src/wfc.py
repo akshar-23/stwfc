@@ -2,27 +2,13 @@ import copy
 import numpy as np
 
 
-def all_neighbors(L, idx, depth=1, pad_value="X"):
-    neighbors = copy.deepcopy(L)
-    np.pad(neighbors, pad_width=depth, constant_values=pad_value)
-
+def all_neighbors(L, idx, depth=1):
     for i in range(len(L.shape)):
         start = idx[i]
         end = idx[i] + 2 * depth + 1
         neighbors = neighbors[start:end]
 
-    
-    # TODO remove self from neighbors
-    # double check start/end idx
-
-    K, I, J = idx
-    neighbors = []
-
-    for k in range(K - 1, K + 2):
-        for i in range(I - 1, I + 2):
-            for j in range(J - 1, J + 2):
-                if k != K or i != I or j != J:
-                    neighbors.append(L[k, i, j])
+    neighbors.remove(L[idx])
     return neighbors
 
 
