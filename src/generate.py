@@ -1,5 +1,6 @@
 from src.train_levels import TRAIN_LEVELS
 from src.train import (
+    tuplify,
     board_to_str,
     pad,
     unpad_3D,
@@ -63,6 +64,22 @@ def compatible(options, candidate):
     return True
 
 
+def compatible_with_tile(candidate, currT):
+    currT_array = np.array(currT)
+    candidate_array = np.array(candidate)
+    for idx in np.ndindex(currT_array.shape):
+        if currT_array[idx] != "." and currT_array[idx] != candidate_array[idx]:
+            return False
+    return True
+
+
+def compatible_with_neighborhood(neighborhood_candidate, neighborhood_options):
+    for i in range(len(neighborhood_candidate)):
+        if neighborhood_candidate[i] not in neighborhood_options[i]:
+            return False
+    return True
+
+
 def test_compatibility():
     options = np.array([[["AB", "AB"], ["CD", "CD"]], [["AB", "AB"], ["XY", "XY"]]])
 
@@ -96,11 +113,23 @@ def test_compatibility():
     ), f"{expected_options} != {actual_options}"
 
 
+def get_compatible_options(tile, options):
+    did_propagate = False
+    compatible_options = []
+    for op in options:
+        if compatible_with_tile(op, tile):
+            compatible_options.append(op)
+        else:
+            did_propagate = True
+    return compatible_options, did_propagate
+
+
 def propagate_neighbors_3D(
     Lpe,
-    L_options_pe,
+    Lpe_options,
     tile_shape,
-    full_context_counts,
+    neighborhood_counts,
+    tile_counts,
     fuzz=False,
     neighborhood_fn=all_neighbors_3D,
 ):
@@ -114,45 +143,56 @@ def propagate_neighbors_3D(
             for j in range(1, J - 1):
                 idx = (k, i, j)
                 currT = Lpe[idx]
+
                 if "." in currT:
-                    currT_options = L_options_pe[idx]
+                    currT_options, did_propagate = get_compatible_options(
+                        currT, Lpe_options[idx]
+                    )
+                    if did_propagate:
+                        Lpe_options[idx] = currT_options
+
                     counts = {}
                     # Current neighborhood
-                    neighborhood_options = neighborhood_fn(L_options_pe, idx)
-                    for context, tile_counts in full_context_counts.items():
-                        for candidate, count in tile_counts.items():
-                            # If the candidate tile matches the current tile
-                            if compatible(currT_options, np.array(candidate)):
-                                if candidate not in counts and fuzz:
-                                    # Candidate is compatible but may not be seen in training.
-                                    counts[candidate] = 1
+                    neighborhood_options = neighborhood_fn(Lpe_options, idx)
+                    for (
+                        candidate_neighborhood,
+                        candidate_tile_counts,
+                    ) in neighborhood_counts.items():
+                        for candidate_tile, count in candidate_tile_counts.items():
+                            if candidate_tile in currT_options:
+
                                 # If the candidate neighborhood matches the current neighborhood
-                                if (
-                                    compatible(neighborhood_options, np.array(context))
-                                    is not None
+                                if compatible_with_neighborhood(
+                                    candidate_neighborhood, neighborhood_options
                                 ):
-                                    if candidate not in counts:
-                                        counts[candidate] = 0
-                                    counts[candidate] += count
+                                    if candidate_tile not in counts:
+                                        counts[candidate_tile] = 0
+                                    counts[candidate_tile] += count
                     if len(counts) < min_len:
                         min_distribution = normalize(counts)
                         min_idx = idx
-                    if len(counts) > 0:
-                        resolvedT, resolvedT_options = resolve_options(
-                            np.array(list(counts.keys()))
+                    if len(counts) == 0:
+                        return (
+                            Lpe,
+                            Lpe_options,
+                            did_propagate,
+                            min_idx,
+                            min_distribution,
                         )
-                        if not np.array_equal(resolvedT_options, currT_options):
-                            L_options_pe[idx] = resolvedT_options
-                            # Lpe[idx] = resolvedT
-                            # Lpe = propagate_overlapping_3D(Lpe, tile_shape)
-                            L_options_pe = propagate_overlapping_3D(
-                                L_options_pe, tile_shape, True
-                            )
-                            did_propagate = True
-    return Lpe, L_options_pe, did_propagate, min_idx, min_distribution
+
+                    new_options = list(counts.keys())
+                    if len(new_options) != len(Lpe_options[idx]):
+                        Lpe_options[idx] = new_options
+                        did_propagate = True
+                    if len(Lpe_options[idx]) == 1:
+                        Lpe[idx] = np.array(Lpe_options[idx][0])
+                        Lpe = propagate_overlapping_3D(Lpe, tile_shape)
+                        did_propagate = True
+    return Lpe, Lpe_options, did_propagate, min_idx, min_distribution
 
 
 def seed_t0(L, seed_vals):
+    K, I, J = L.shape
     for s in seed_vals:
         sk = 0
         si = randrange(1, I - 1)
@@ -166,7 +206,8 @@ def seed_t0(L, seed_vals):
 
 
 def wfc_3D(
-    full_context_counts,
+    tile_counts,
+    neighborhood_counts,
     level_shape,
     tile_shape,
     max_num_trials=100,
@@ -185,31 +226,39 @@ def wfc_3D(
     while "." in L and num_trials < max_num_trials:
         num_samples = 0
         L = np.full(level_shape, ".")
-        L_options = np.full(level_shape, "".join(sorted(list("PDB_W"))).strip())
+
         seed_fn, seed_vals = seed
         L = seed_fn(L, seed_vals)
 
         Lp = pad(L, tile_shape)
         Lpe = encode_tiles_3D(Lp, tile_shape)
 
-        L_options_p = pad(L_options, tile_shape)
-        L_options_pe = encode_tiles_3D(L_options_p, tile_shape)
+        # Initialize options with all seen tiles.
+        Lpe_options = {}
+        Ke, Ie, Je, Kt, It, Jt = Lpe.shape
+        for idx in np.ndindex(Ke, Ie, Je):
+            if "." not in Lpe[idx]:
+                Lpe_options[idx] = [tuplify(Lpe[idx])]
+            else:
+                Lpe_options[idx] = list(tile_counts.keys())
 
         finished = False
-        while not finished:
+        while not finished and num_samples < 1000:
             did_propagate = True
-            while did_propagate:
+            most_constrained_distro = {"": ""}
+            while did_propagate and most_constrained_distro != {}:
                 (
                     Lpe,
-                    L_options_pe,
+                    Lpe_options,
                     did_propagate,
                     most_constrained_idx,
                     most_constrained_distro,
                 ) = propagate_neighbors_3D(
                     Lpe,
-                    L_options_pe,
+                    Lpe_options,
                     tile_shape,
-                    full_context_counts,
+                    neighborhood_counts,
+                    tile_counts,
                     fuzz,
                     neighborhood_fn,
                 )
@@ -218,23 +267,14 @@ def wfc_3D(
                 finished = True
             else:
                 tile = np.array(sample(most_constrained_distro))
-                if not single_char:
-                    # Set the entire tile at once
-                    Lpe[most_constrained_idx] = tile
-                    L_options_pe[most_constrained_idx] = tile
-                else:
-                    # set a single tile
-                    set_tile = Lpe[most_constrained_idx]
-                    for idx in np.ndindex(set_tile.shape):
-                        if set_tile[idx] == ".":
-                            set_tile[idx] = tile[idx]
-                            L_options_pe[most_constrained_idx][idx] = tile[idx]
-                            break
-                    Lpe[most_constrained_idx] = set_tile
+                Lpe[most_constrained_idx] = tile
+                Lpe_options[most_constrained_idx] = [tuplify(tile)]
 
                 Lpe = propagate_overlapping_3D(Lpe, tile_shape)
-                L_options_pe = propagate_overlapping_3D(L_options_pe, tile_shape, True)
                 num_samples += 1
+                # Lp = decode_tiles_3D(Lpe)
+                # L = unpad_3D(Lp, tile_shape)
+                # print(L)
 
         Lp = decode_tiles_3D(Lpe)
         L = unpad_3D(Lp, tile_shape)
@@ -245,7 +285,7 @@ def wfc_3D(
             best_num_samples = num_samples
         num_trials += 1
 
-    print(best)
+    # print(best)
     return best, num_trials, best_num_samples
 
 
@@ -273,8 +313,10 @@ def train_generate_3D(
                 level = level[:, 1:, :]
             # Replace B' with B
             level[level == "B'"] = "B"
-            # Remove the last timestep to ensure that P is always present
-            level = level[:-1]
+            # Remove the last timestep to ensure that P is always present, and
+            # duplicate the second-to-last to allow P to stay at the door
+            level[-1] = level[-2]
+            level = np.append(level, [level[-1], level[-1]], axis=0)
             fdisplay = "solutions_display"
             Path(fdisplay).mkdir(parents=True, exist_ok=True)
             fsolndisplay = f"{fdisplay}/level{i}"
@@ -300,6 +342,7 @@ def train_generate_3D(
     for i in range(num_levels):
         start_time = time.time()
         level, num_trials, num_samples = wfc_3D(
+            tile_counts,
             neighborhood_counts,
             gen_shape,
             tile_shape,
@@ -319,10 +362,6 @@ def train_generate_3D(
         Path(level_folder).mkdir(parents=True, exist_ok=True)
         with open(f"{level_folder}/raw.json", "w", encoding="utf-8") as f:
             json.dump(level.tolist(), f, ensure_ascii=False, indent=4)
-        with open(f"{level_folder}/stats.txt", "w", encoding="utf-8") as f:
-            f.write(f"Num trials: {str(num_trials)}/{str(max_num_trials)}")
-            f.write(f"\nNum samples: {str(num_samples)}")
-            f.write(f"\nElapsed: {str(elapsed)}")
         display_folder = f"{level_folder}/display"
         Path(display_folder).mkdir(parents=True, exist_ok=True)
         for b, board in enumerate(level):
@@ -331,29 +370,51 @@ def train_generate_3D(
                 b_str = "0" + b_str
             with open(f"{display_folder}/{b_str}.lvl", "w", encoding="utf-8") as f:
                 f.write(board_to_str(board))
+        completed = False
         if "." not in level:
+            completed = True
             num_complete += 1
+        with open(f"{level_folder}/stats.json", "w", encoding="utf-8") as f:
+            loginfo = {
+                "dim": "3D",
+                "max_num_trials": max_num_trials,
+                "seed": f"{str(seed[0].__name__)}: {seed[1]}",
+                "level_range": level_range,
+                "gen_shape": gen_shape,
+                "fuzz": fuzz,
+                "single_char": single_char,
+                "complete": completed,
+                "elapsed": elapsed,
+                "trials": num_trials,
+                "samples": num_samples,
+                "neighborhood": str(neighborhood_fn.__name__),
+            }
+            json.dump(loginfo, f)
     total_end = time.time()
     total_elapsed = total_end - total_start
-    with open(f"{experiment_folder}/stats.txt", "w", encoding="utf-8") as f:
-        f.write("3D trials")
-        f.write(f"\nretry x {max_num_trials}")
-        f.write(f"\nseeded with {seed}")
-        f.write(f"\ntrained on {level_range}")
-        f.write(f"\ngeneration shape {gen_shape}")
-        f.write(f"\ntile shape {tile_shape}")
-        f.write(f"\nfuzz? {str(fuzz)}")
-        f.write(f"\nsingle char? {str(single_char)}")
-        f.write(f"\ncomplete levels {str(num_complete)}/{num_levels}")
-        f.write(f"\nelapsed time {str(total_elapsed)}")
-        f.write(f"\navg num trials: {str(aggregate_trials/num_levels)}")
-        f.write(f"\navg num samples: {str(aggregate_samples/num_levels)}")
-        f.write(f"\nneighborhood: {str(neighborhood_fn.__name__)}")
+    with open(f"{experiment_folder}/stats.json", "w", encoding="utf-8") as f:
+        loginfo = {
+            "dim": "3D",
+            "max_num_trials": max_num_trials,
+            "seed": f"{str(seed[0].__name__)}: {seed[1]}",
+            "level_range": level_range,
+            "gen_shape": gen_shape,
+            "fuzz": fuzz,
+            "single_char": single_char,
+            "completed": num_complete,
+            "total": num_levels,
+            "elapsed": total_elapsed,
+            "avg trials": aggregate_trials / num_levels,
+            "avg samples": aggregate_samples / num_levels,
+            "neighborhood": str(neighborhood_fn.__name__),
+        }
+        json.dump(loginfo, f)
     return
 
 
 def seed_tn(L, dummy):
-    dk = L.shape[0] - 1
+    K, I, J = L.shape
+    dk = K - 1
     di = randrange(1, I - 1)
     dj = randrange(2, J - 2)
     didx = (dk, di, dj)
@@ -366,25 +427,29 @@ def seed_tn(L, dummy):
     L[dk, di, pj] = "P"
 
     # Bottom row is always "W"
-    K, I, J = L.shape()
     L[0][I - 1] = ["W"] * J
     return L
 
 
 if __name__ == "__main__":
-    level_range = ["A"]  # ["A", 1, 2, 3, 4]
-    gen_shape = (4, 4, 8)  # (5, 7, 10)
-    tile_shapes = [(2, 2, 2)]  # [(2, 3, 2), (2, 2, 2)]
+    level_range = ["A", 1, 2, 3, 4]
+    gen_shape = (10, 7, 20)  # (5, 7, 10)
+    tile_shapes = [(1, 2, 2)]  # [(2, 3, 2), (2, 2, 2)]
     num_levels = 1  # 10
     max_num_trials = 1  # 10
     seeds = [
-        (seed_t0, [])
-    ]  # [(seed_t0, ["P"]), (seed_t0, []), (seed_t0, ["D"]), (seed_tn, [])]
+        # (seed_t0, ["P"]),
+        # (seed_t0, ["D"]),
+        # (seed_t0, []),
+        (seed_tn, [])
+    ]
     fuzzs = [False]
     single_chars = [True]
     neighborhood_fns = [
-        orthogonal_neighbors_3D
-    ]  # [orthogonal_neighbors_3D, horizontal_neighbors_3D]
+        horizontal_neighbors_3D,
+        orthogonal_neighbors_3D,
+        all_neighbors_3D,
+    ]
 
     arg_combos = []
 

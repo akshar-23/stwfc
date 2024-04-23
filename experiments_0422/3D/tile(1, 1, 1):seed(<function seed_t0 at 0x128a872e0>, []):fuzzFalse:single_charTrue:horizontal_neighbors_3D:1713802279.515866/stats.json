@@ -1,0 +1,1 @@
+{"dim": "3D", "max_num_trials": 10, "seed": "seed_t0: []", "level_range": ["A", 1, 2, 3, 4], "gen_shape": [5, 7, 10], "fuzz": false, "single_char": true, "completed": 10, "total": 10, "elapsed": 153.04037404060364, "avg trials": 1.0, "avg samples": 221.0, "neighborhood": "horizontal_neighbors_3D"}

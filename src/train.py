@@ -30,11 +30,21 @@ def test_str_to_from_board():
     assert back_to_str == board_str, f"{back_to_str} != {board_str}"
 
 
-def pad(grid, tile_shape=(1, 1, 1), pad_value="X"):
-    pad_width = []
-    for dim_width in tile_shape:
-        pad_width.append((dim_width, dim_width))
-    return np.pad(grid, pad_width=tuple(pad_width), constant_values=pad_value)
+def pad(grid, tile_shape=(1, 1, 1), pad_values=("T", "_", "_")):
+    constant_values = []
+    for val in pad_values:
+        if len(val) == 1:
+            constant_values.append((val, val))
+        else:
+            constant_values.append(val)
+    constant_values = tuplify(constant_values)
+
+    L = grid
+    for i in range(len(pad_values) - 1, -1, -1):
+        pad_width = [(0, 0), (0, 0), (0, 0)]
+        pad_width[i] = (tile_shape[i], tile_shape[i])
+        L = np.pad(L, pad_width=tuplify(pad_width), constant_values=constant_values)
+    return L
 
 
 def unpad_3D(grid, tile_shape=(1, 1, 1)):
@@ -128,7 +138,7 @@ def all_neighbors_3D(L, idx):
             for j in range(J - 1, J + 2):
                 if k != K or i != I or j != J:
                     neighbors.append(L[k, i, j])
-    return np.array(neighbors)
+    return neighbors
 
 
 # above, below, left, right, center through time
@@ -141,7 +151,7 @@ def orthogonal_neighbors_3D(L, idx):
             for j in range(J - 1, J + 2):
                 if (k != K or i != I or j != J) and (i == I or j == J):
                     neighbors.append(L[k, i, j])
-    return np.array(neighbors)
+    return neighbors
 
 
 # left, right, center through time
@@ -153,7 +163,7 @@ def horizontal_neighbors_3D(L, idx):
         for j in range(J - 1, J + 2):
             if k != K or j != J:
                 neighbors.append(L[k, I, j])
-    return np.array(neighbors)
+    return neighbors
 
 
 def test_neighbors():
@@ -501,6 +511,7 @@ def test_encode_decode():
 def train_3D(levels, tile_shape, neighborhood_fn=all_neighbors_3D):
     tile_counts = {}
     neighborhood_counts = {}
+    count = 0
     for L in levels:
         Lp = pad(L, tile_shape)
         Lpe = encode_tiles_3D(Lp, tile_shape)
@@ -515,6 +526,7 @@ def train_3D(levels, tile_shape, neighborhood_fn=all_neighbors_3D):
                     N = tuplify(neighborhood_fn(Lpe, (k, i, j)))
                     if N not in neighborhood_counts:
                         neighborhood_counts[N] = {}
+                        count += 1
                     if T not in neighborhood_counts[N]:
                         neighborhood_counts[N][T] = 0
                     neighborhood_counts[N][T] += 1
