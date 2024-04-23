@@ -45,16 +45,13 @@ def propagate_overlapping_3D(Lpe, tile_shape, options=False):
 
 def resolve_options(candidates):
     # Find an options tile that represents all the candidates.
+    candidates = np.array(candidates)
     collapsed = candidates[0]
-    options = np.full(candidates[0].shape, "     ")
     for candidate in candidates:
         for idx in np.ndindex(candidate.shape):
             if collapsed[idx] != candidate[idx]:
                 collapsed[idx] = "."
-            curr_options = list(options[idx])
-            curr_options.append(candidate[idx])
-            options[idx] = "".join(sorted(list(set(curr_options)))).strip()
-    return collapsed, options
+    return collapsed
 
 
 def compatible(options, candidate):
@@ -181,6 +178,11 @@ def propagate_neighbors_3D(
                         )
 
                     new_options = list(counts.keys())
+                    # resolved_T = resolve_options(new_options)
+                    # if not np.array_equal(resolved_T, currT):
+                    #     Lpe[idx] = resolved_T
+                    #     Lpe = propagate_overlapping_3D(Lpe, tile_shape)
+                    #     did_propagate = True
                     if len(new_options) != len(Lpe_options[idx]):
                         Lpe_options[idx] = new_options
                         did_propagate = True
@@ -433,15 +435,15 @@ def seed_tn(L, dummy):
 
 if __name__ == "__main__":
     level_range = ["A", 1, 2, 3, 4]
-    gen_shape = (10, 7, 20)  # (5, 7, 10)
+    gen_shape = (5, 7, 10)  # (5, 7, 10)
     tile_shapes = [(1, 2, 2)]  # [(2, 3, 2), (2, 2, 2)]
     num_levels = 1  # 10
     max_num_trials = 1  # 10
     seeds = [
-        # (seed_t0, ["P"]),
+        (seed_t0, ["P"]),
         # (seed_t0, ["D"]),
         # (seed_t0, []),
-        (seed_tn, [])
+        # (seed_tn, [])
     ]
     fuzzs = [False]
     single_chars = [True]
