@@ -34,13 +34,13 @@ def sample(distribution):
             return x
 
 
-def propagate_overlapping_3D(Lpe, tile_shape, options=False):
+def propagate_overlapping_3D(Lep, tile_shape, options=False):
     # Propagate to neighbors
-    Lp = decode_tiles_3D(Lpe, options)
-    L = unpad_3D(Lp, tile_shape)
-    Lp = pad(L, tile_shape)
-    Lpe = encode_tiles_3D(Lp, tile_shape)
-    return Lpe
+    Le = unpad_3D(Lep)
+    L = decode_tiles_3D(Le, options)
+    Le = encode_tiles_3D(L, tile_shape)
+    Lep = pad(Le, tile_shape)
+    return Lep
 
 
 def resolve_options(candidates):
@@ -232,32 +232,32 @@ def wfc_3D(
         seed_fn, seed_vals = seed
         L = seed_fn(L, seed_vals)
 
-        Lp = pad(L, tile_shape)
-        Lpe = encode_tiles_3D(Lp, tile_shape)
+        Le = encode_tiles_3D(L, tile_shape)
+        Lep = pad(Le, tile_shape)
 
         # Initialize options with all seen tiles.
-        Lpe_options = {}
-        Ke, Ie, Je, Kt, It, Jt = Lpe.shape
+        Lep_options = {}
+        Ke, Ie, Je, Kt, It, Jt = Lep.shape
         for idx in np.ndindex(Ke, Ie, Je):
-            if "." not in Lpe[idx]:
-                Lpe_options[idx] = [tuplify(Lpe[idx])]
+            if "." not in Lep[idx]:
+                Lep_options[idx] = [tuplify(Lep[idx])]
             else:
-                Lpe_options[idx] = list(tile_counts.keys())
+                Lep_options[idx] = list(tile_counts.keys())
 
         finished = False
-        while not finished and num_samples < 1000:
+        while not finished:
             did_propagate = True
             most_constrained_distro = {"": ""}
             while did_propagate and most_constrained_distro != {}:
                 (
-                    Lpe,
-                    Lpe_options,
+                    Lep,
+                    Lep_options,
                     did_propagate,
                     most_constrained_idx,
                     most_constrained_distro,
                 ) = propagate_neighbors_3D(
-                    Lpe,
-                    Lpe_options,
+                    Lep,
+                    Lep_options,
                     tile_shape,
                     neighborhood_counts,
                     tile_counts,
@@ -269,17 +269,18 @@ def wfc_3D(
                 finished = True
             else:
                 tile = np.array(sample(most_constrained_distro))
-                Lpe[most_constrained_idx] = tile
-                Lpe_options[most_constrained_idx] = [tuplify(tile)]
+                Lep[most_constrained_idx] = tile
+                Lep_options[most_constrained_idx] = [tuplify(tile)]
 
-                Lpe = propagate_overlapping_3D(Lpe, tile_shape)
+                Lep = propagate_overlapping_3D(Lep, tile_shape)
                 num_samples += 1
                 # Lp = decode_tiles_3D(Lpe)
                 # L = unpad_3D(Lp, tile_shape)
                 # print(L)
 
-        Lp = decode_tiles_3D(Lpe)
-        L = unpad_3D(Lp, tile_shape)
+        Le = unpad_3D(Lep)
+        L = decode_tiles_3D(Le)
+
         count_L = np.count_nonzero(L == ".")
         if count_L < best_contra_count:
             best = copy.deepcopy(L)
@@ -383,6 +384,7 @@ def train_generate_3D(
                 "seed": f"{str(seed[0].__name__)}: {seed[1]}",
                 "level_range": level_range,
                 "gen_shape": gen_shape,
+                "tile_shape": tile_shape,
                 "fuzz": fuzz,
                 "single_char": single_char,
                 "complete": completed,
@@ -435,14 +437,14 @@ def seed_tn(L, dummy):
 
 if __name__ == "__main__":
     level_range = ["A", 1, 2, 3, 4]
-    gen_shape = (5, 7, 10)  # (5, 7, 10)
-    tile_shapes = [(1, 2, 2)]  # [(2, 3, 2), (2, 2, 2)]
+    gen_shape = (12, 4, 11)  # (5, 7, 10)
+    tile_shapes = [(2, 2, 2)]  # [(1, 2, 2), (2, 3, 2), (2, 2, 2)]
     num_levels = 1  # 10
     max_num_trials = 1  # 10
     seeds = [
-        (seed_t0, ["P"]),
+        # (seed_t0, ["P"]),
         # (seed_t0, ["D"]),
-        # (seed_t0, []),
+        (seed_t0, []),
         # (seed_tn, [])
     ]
     fuzzs = [False]

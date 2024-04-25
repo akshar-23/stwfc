@@ -30,28 +30,41 @@ def test_str_to_from_board():
     assert back_to_str == board_str, f"{back_to_str} != {board_str}"
 
 
-def pad(grid, tile_shape=(1, 1, 1), pad_values=("T", "_", "_")):
+def pad(grid, tile_shape=(1, 1, 1), pad_values=("X", "X", "X"), pad_widths=(1, 1, 1)):
     constant_values = []
-    for val in pad_values:
-        if len(val) == 1:
-            constant_values.append((val, val))
+    for dim_vals in pad_values:
+        if len(dim_vals) == 1:
+            constant_values.append((dim_vals[0], dim_vals[0]))
         else:
-            constant_values.append(val)
+            constant_values.append(dim_vals)
     constant_values = tuplify(constant_values)
 
     L = grid
     for i in range(len(pad_values) - 1, -1, -1):
-        pad_width = [(0, 0), (0, 0), (0, 0)]
-        pad_width[i] = (tile_shape[i], tile_shape[i])
-        L = np.pad(L, pad_width=tuplify(pad_width), constant_values=constant_values)
+        expanded_pad_widths = [(0, 0), (0, 0), (0, 0), (0, 0), (0, 0), (0, 0)]
+        expanded_constant_values = [
+            constant_values[0],
+            constant_values[0],
+            constant_values[0],
+            constant_values[0],
+            constant_values[0],
+            constant_values[0],
+        ]
+        expanded_pad_widths[i] = (pad_widths[i], pad_widths[i])
+        expanded_constant_values[i] = constant_values[i]
+        L = np.pad(
+            L,
+            pad_width=tuplify(expanded_pad_widths),
+            constant_values=tuplify(expanded_constant_values),
+        )
     return L
 
 
-def unpad_3D(grid, tile_shape=(1, 1, 1)):
+def unpad_3D(grid, pad_widths=(1, 1, 1)):
     return grid[
-        tile_shape[0] : -tile_shape[0],
-        tile_shape[1] : -tile_shape[1],
-        tile_shape[2] : -tile_shape[2],
+        pad_widths[0] : -pad_widths[0],
+        pad_widths[1] : -pad_widths[1],
+        pad_widths[2] : -pad_widths[2],
     ]
 
 
@@ -513,17 +526,18 @@ def train_3D(levels, tile_shape, neighborhood_fn=all_neighbors_3D):
     neighborhood_counts = {}
     count = 0
     for L in levels:
-        Lp = pad(L, tile_shape)
-        Lpe = encode_tiles_3D(Lp, tile_shape)
-        K, I, J, Kt, It, Jt = Lpe.shape
+        Le = encode_tiles_3D(L, tile_shape)
+        Lep = pad(Le, tile_shape)
+
+        K, I, J, Kt, It, Jt = Lep.shape
         for k in range(1, K - 1):
             for i in range(1, I - 1):
                 for j in range(1, J - 1):
-                    T = tuplify(Lpe[k, i, j])
+                    T = tuplify(Lep[k, i, j])
                     if T not in tile_counts:
                         tile_counts[T] = 0
                     tile_counts[T] += 1
-                    N = tuplify(neighborhood_fn(Lpe, (k, i, j)))
+                    N = tuplify(neighborhood_fn(Lep, (k, i, j)))
                     if N not in neighborhood_counts:
                         neighborhood_counts[N] = {}
                         count += 1

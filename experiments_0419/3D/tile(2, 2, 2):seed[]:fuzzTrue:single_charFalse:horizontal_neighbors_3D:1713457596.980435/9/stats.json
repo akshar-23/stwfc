@@ -1,0 +1,1 @@
+{"seed": "seed_t0: []", "tile_shape": [2, 2, 2], "fuzz": true, "single_char": true, "neighborhood": "horizontal_neighbors_3D", "trials": 2, "samples": 63, "elapsed": 201.18513774871826}
