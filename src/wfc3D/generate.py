@@ -1,4 +1,4 @@
-from src.train_levels import TRAIN_LEVELS
+from training_solutions.train_levels import TRAIN_LEVELS
 from src.train import (
     tuplify,
     board_to_str,

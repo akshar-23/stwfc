@@ -354,8 +354,13 @@ def visualize_experiments(experiment_dir):
         | df["block_drop"]
     )
     df["none"] = df["any"]
-    df.loc[df["any"] == 0, "none"] = 1
-    df.loc[df["any"] == 1, "none"] = 0
+    df.loc[df["any"] == False, "none"] = True
+    df.loc[df["any"] == True, "none"] = False
+
+    mechanics = df[df["completed"] == 1][["any", "none"]].mean()
+    plt.clf()
+    mechanics.plot(kind="barh")
+    plt.show()
 
     mechanics = df[df["completed"] == 1][[
         "fall_1",
@@ -371,11 +376,6 @@ def visualize_experiments(experiment_dir):
         "block_drop",
     ]].mean()
 
-    plt.clf()
-    mechanics.plot(kind="barh")
-    plt.show()
-
-    mechanics = df[df["completed"] == 1][["any", "none"]].mean()
     plt.clf()
     mechanics.plot(kind="barh")
     plt.show()
