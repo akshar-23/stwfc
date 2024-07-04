@@ -1,0 +1,1 @@
+{"train_paths": ["src/training_data/limerick"], "padding": {"pad_width": [[1, 1], [1, 1], [1, 1]], "constant_values": [["t", "T"], ["_", "W"], ["_", "_"]], "axis_order": [2, 1, 0]}, "local_transforms": {"flipy": true}, "global_transforms": {"flipy": true}, "grid_size": [10, 10, 10], "pattern_size": [2, 3, 3], "elapsed": {"0": 3309.2883789539337, "1": 3307.8121769428253}}
