@@ -16,8 +16,12 @@ def save_lvl_displays(paths):
                 level = level.tolist()
                 name = Path(path).stem
                 dir = os.path.dirname(path)
-                for _, board in enumerate(level):
-                    level_str += board_to_str(board)
+                Path(f"{dir}/{name}").mkdir(parents=True, exist_ok=True)
+                for i, board in enumerate(level):
+                    board_str = board_to_str(board)
+                    with open(f"{dir}/{name}/{i}.lvl", "w", encoding="utf-8") as f:
+                        f.write(board_str)
+                    level_str += board_str
                     level_str += "\n\n***\n\n"
                 with open(f"{dir}/{name}.txt", "w", encoding="utf-8") as f:
                     f.write(level_str)
@@ -163,5 +167,6 @@ def process(d_results):
 
 
 if __name__ == "__main__":
-    results_folder = f"src/results_data"
-    process(results_folder)
+    # results_folder = f"src/results_data"
+    # process(results_folder)
+    save_lvl_displays(["src/training_data/sokoban"])
