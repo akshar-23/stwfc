@@ -191,6 +191,7 @@ def board_to_str(board):
         board_str += row_str + "\n"
     return board_str[:-1]  # trim final \n
 
+
 def save_level(level, raw_f, display_d):
     with open(raw_f, "w", encoding="utf-8") as f:
         json.dump(level, f, ensure_ascii=False, indent=4)
@@ -270,13 +271,13 @@ def process(
 
 if __name__ == "__main__":
 
-    grid_size = (10, 6, 6)
+    grid_size = (15, 6, 15)
     pattern_size = (2, 3, 3)
 
-    train_paths = [f"src/training_data/simple_path/path_no_walls/path_1_nw.json"]
+    train_paths = [f"src/training_data/blockdude/solutions/block_01"]
     num_tries = 10
 
-    initialize_fn = initialize_path_noblank
-    settings_fn = get_path_settings
+    initialize_fn = initialize_block
+    settings_fn = get_block_settings
 
     process(train_paths, initialize_fn, settings_fn, grid_size, pattern_size, num_tries)
