@@ -112,15 +112,18 @@ def get_soko_settings():
 
 def get_path_settings():
     path_padding = {
-        "pad_width": ((0, 1), (1, 1), (1, 1)),
+        "pad_width": ((0, 1), (1, 1), (1, 1)), # (-T, +T), (-Y, +Y), (-X, +X)
         "constant_values": (
-            (("t"), ("T")),
-            (("_"), ("_")),
-            (("_"), ("_")),
+            (("t"), ("T")), # -T, +T
+            (("_"), ("_")), # -Y, +Y
+            (("_"), ("_")), # -X, +X
         ),
+        # order to apply padding. generally should be (2, 1, 0) (X, Y, T)
         "axis_order": (2, 1, 0),
     }
+    # Transforms to apply to found patterns
     local_transforms = {"flipx": True, "flipy": True, "rotxy": [1, 2, 3]}
+    # Transforms to apply to the entire example grid
     global_transforms = local_transforms
     return path_padding, local_transforms, global_transforms
 
@@ -142,13 +145,13 @@ def get_maze_settings():
 
 def get_lime_settings():
     lime_padding = {
-        "pad_width": ((0, 1), (1, 1), (1, 1)),
+        "pad_width": ((0, 1), (1, 1), (1, 1)), 
         "constant_values": (
-            (("t"), ("T")),
-            (("_"), ("W")),
-            (("_"), ("_")),
+            (("t"), ("T")), 
+            (("_"), ("W")), 
+            (("_"), ("_")), 
         ),
-        "axis_order": (2, 1, 0),
+        "axis_order": (2, 1, 0), 
     }
     local_transforms = {"flipx": True}
     global_transforms = local_transforms
@@ -271,13 +274,18 @@ def process(
 
 if __name__ == "__main__":
 
-    grid_size = (15, 6, 15)
-    pattern_size = (2, 3, 3)
+    grid_size = (6, 4, 4)  # desired result grid shape (time, y, x)
+    pattern_size = (2, 3, 3)  # desired pattern shape (time, y, x)
 
-    train_paths = [f"src/training_data/blockdude/solutions/block_01"]
-    num_tries = 10
+    # list of paths to get example data from, recursively.
+    # Directories can ONLY contain json files
+    train_paths = [
+        f"AIIDE/training/field/path_3_2_nw.json",
+        f"AIIDE/training/field/path_1_nw.json",
+    ]
+    num_tries = 10  # number of times to attempt generating a level
 
-    initialize_fn = initialize_block
-    settings_fn = get_block_settings
+    initialize_fn = initialize_path_noblank  # initializer for the game
+    settings_fn = get_path_settings  # settings for the game
 
     process(train_paths, initialize_fn, settings_fn, grid_size, pattern_size, num_tries)
