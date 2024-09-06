@@ -1,7 +1,7 @@
 # STWFC
 
 To run:
-1. Download and install the game_level branch of the wave-function-collapse project https://github.com/flaneuseh/wave-function-collapse/tree/game_level
+1. Download and install the game_level branch of the wave-function-collapse project https://github.com/flaneuseh/wave-function-collapse/releases/tag/AIIDE
 2. Change values in use_coac:__main__ to desired configuration.
 3. ```python -m src.use_coac```
 
