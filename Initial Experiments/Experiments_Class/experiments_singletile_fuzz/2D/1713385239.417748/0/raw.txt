@@ -1,0 +1,11 @@
+(1, 7, 10)
+__________
+_W__W_____
+BW_BW___P_
+WWWWWW__W_
+_____W__WW
+WP___W__DW
+WWWWWWWWWW
+
+***
+

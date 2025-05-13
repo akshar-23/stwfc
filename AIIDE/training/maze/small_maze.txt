@@ -1,91 +1,91 @@
 (10, 6, 5)
-W W W W W
-W _ _ _ W
-W D W _ W
-W W W _ W
-W P _ _ W
-W W W W W
+WWWWW
+W___W
+WDW_W
+WWW_W
+WP__W
+WWWWW
 
 ***
 
-W W W W W
-W _ _ _ W
-W D W _ W
-W W W _ W
-W _ P _ W
-W W W W W
+WWWWW
+W___W
+WDW_W
+WWW_W
+W_P_W
+WWWWW
 
 ***
 
-W W W W W
-W _ _ _ W
-W D W _ W
-W W W _ W
-W _ _ P W
-W W W W W
+WWWWW
+W___W
+WDW_W
+WWW_W
+W__PW
+WWWWW
 
 ***
 
-W W W W W
-W _ _ _ W
-W D W _ W
-W W W P W
-W _ _ _ W
-W W W W W
+WWWWW
+W___W
+WDW_W
+WWWPW
+W___W
+WWWWW
 
 ***
 
-W W W W W
-W _ _ _ W
-W D W P W
-W W W _ W
-W _ _ _ W
-W W W W W
+WWWWW
+W___W
+WDWPW
+WWW_W
+W___W
+WWWWW
 
 ***
 
-W W W W W
-W _ _ P W
-W D W _ W
-W W W _ W
-W _ _ _ W
-W W W W W
+WWWWW
+W__PW
+WDW_W
+WWW_W
+W___W
+WWWWW
 
 ***
 
-W W W W W
-W _ P _ W
-W D W _ W
-W W W _ W
-W _ _ _ W
-W W W W W
+WWWWW
+W_P_W
+WDW_W
+WWW_W
+W___W
+WWWWW
 
 ***
 
-W W W W W
-W P _ _ W
-W D W _ W
-W W W _ W
-W _ _ _ W
-W W W W W
+WWWWW
+WP__W
+WDW_W
+WWW_W
+W___W
+WWWWW
 
 ***
 
-W W W W W
-W P _ _ W
-W D W _ W
-W W W _ W
-W _ _ _ W
-W W W W W
+WWWWW
+WP__W
+WDW_W
+WWW_W
+W___W
+WWWWW
 
 ***
 
-W W W W W
-W P _ _ W
-W D W _ W
-W W W _ W
-W _ _ _ W
-W W W W W
+WWWWW
+WP__W
+WDW_W
+WWW_W
+W___W
+WWWWW
 
 ***
 

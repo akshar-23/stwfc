@@ -190,7 +190,7 @@ def board_to_str(board):
     board_str = ""
     for row in board:
         row = ["." if x == "" else x for x in row]
-        row_str = " ".join(row)
+        row_str = "".join(row)
         board_str += row_str + "\n"
     return board_str[:-1]  # trim final \n
 

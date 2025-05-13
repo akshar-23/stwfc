@@ -1,291 +1,291 @@
 (29, 7, 6)
-W W W W W W
-W _ _ _ O W
-W _ _ B _ W
-W O W _ _ W
-W P W B _ W
-W _ _ _ _ W
-W W W W W W
+WWWWWW
+W___OW
+W__B_W
+WOW__W
+WPWB_W
+W____W
+WWWWWW
 
 ***
 
-W W W W W W
-W _ _ _ O W
-W _ _ B _ W
-W O W _ _ W
-W _ W B _ W
-W P _ _ _ W
-W W W W W W
+WWWWWW
+W___OW
+W__B_W
+WOW__W
+W_WB_W
+WP___W
+WWWWWW
 
 ***
 
-W W W W W W
-W _ _ _ O W
-W _ _ B _ W
-W O W _ _ W
-W _ W B _ W
-W _ P _ _ W
-W W W W W W
+WWWWWW
+W___OW
+W__B_W
+WOW__W
+W_WB_W
+W_P__W
+WWWWWW
 
 ***
 
-W W W W W W
-W _ _ _ O W
-W _ _ B _ W
-W O W _ _ W
-W _ W B _ W
-W _ _ P _ W
-W W W W W W
+WWWWWW
+W___OW
+W__B_W
+WOW__W
+W_WB_W
+W__P_W
+WWWWWW
 
 ***
 
-W W W W W W
-W _ _ _ O W
-W _ _ B _ W
-W O W _ _ W
-W _ W B _ W
-W _ _ _ P W
-W W W W W W
+WWWWWW
+W___OW
+W__B_W
+WOW__W
+W_WB_W
+W___PW
+WWWWWW
 
 ***
 
-W W W W W W
-W _ _ _ O W
-W _ _ B _ W
-W O W _ _ W
-W _ W B P W
-W _ _ _ _ W
-W W W W W W
+WWWWWW
+W___OW
+W__B_W
+WOW__W
+W_WBPW
+W____W
+WWWWWW
 
 ***
 
-W W W W W W
-W _ _ _ O W
-W _ _ B _ W
-W O W _ P W
-W _ W B _ W
-W _ _ _ _ W
-W W W W W W
+WWWWWW
+W___OW
+W__B_W
+WOW_PW
+W_WB_W
+W____W
+WWWWWW
 
 ***
 
-W W W W W W
-W _ _ _ O W
-W _ _ B _ W
-W O W P _ W
-W _ W B _ W
-W _ _ _ _ W
-W W W W W W
+WWWWWW
+W___OW
+W__B_W
+WOWP_W
+W_WB_W
+W____W
+WWWWWW
 
 ***
 
-W W W W W W
-W _ _ B O W
-W _ _ P _ W
-W O W _ _ W
-W _ W B _ W
-W _ _ _ _ W
-W W W W W W
+WWWWWW
+W__BOW
+W__P_W
+WOW__W
+W_WB_W
+W____W
+WWWWWW
 
 ***
 
-W W W W W W
-W _ _ B O W
-W _ P _ _ W
-W O W _ _ W
-W _ W B _ W
-W _ _ _ _ W
-W W W W W W
+WWWWWW
+W__BOW
+W_P__W
+WOW__W
+W_WB_W
+W____W
+WWWWWW
 
 ***
 
-W W W W W W
-W _ P B O W
-W _ _ _ _ W
-W O W _ _ W
-W _ W B _ W
-W _ _ _ _ W
-W W W W W W
+WWWWWW
+W_PBOW
+W____W
+WOW__W
+W_WB_W
+W____W
+WWWWWW
 
 ***
 
-W W W W W W
-W _ _ P G W
-W _ _ _ _ W
-W O W _ _ W
-W _ W B _ W
-W _ _ _ _ W
-W W W W W W
+WWWWWW
+W__PGW
+W____W
+WOW__W
+W_WB_W
+W____W
+WWWWWW
 
 ***
 
-W W W W W W
-W _ _ _ G W
-W _ _ P _ W
-W O W _ _ W
-W _ W B _ W
-W _ _ _ _ W
-W W W W W W
+WWWWWW
+W___GW
+W__P_W
+WOW__W
+W_WB_W
+W____W
+WWWWWW
 
 ***
 
-W W W W W W
-W _ _ _ G W
-W _ _ _ P W
-W O W _ _ W
-W _ W B _ W
-W _ _ _ _ W
-W W W W W W
+WWWWWW
+W___GW
+W___PW
+WOW__W
+W_WB_W
+W____W
+WWWWWW
 
 ***
 
-W W W W W W
-W _ _ _ G W
-W _ _ _ _ W
-W O W _ P W
-W _ W B _ W
-W _ _ _ _ W
-W W W W W W
+WWWWWW
+W___GW
+W____W
+WOW_PW
+W_WB_W
+W____W
+WWWWWW
 
 ***
 
-W W W W W W
-W _ _ _ G W
-W _ _ _ _ W
-W O W _ _ W
-W _ W B P W
-W _ _ _ _ W
-W W W W W W
+WWWWWW
+W___GW
+W____W
+WOW__W
+W_WBPW
+W____W
+WWWWWW
 
 ***
 
-W W W W W W
-W _ _ _ G W
-W _ _ _ _ W
-W O W _ _ W
-W _ W B _ W
-W _ _ _ P W
-W W W W W W
+WWWWWW
+W___GW
+W____W
+WOW__W
+W_WB_W
+W___PW
+WWWWWW
 
 ***
 
-W W W W W W
-W _ _ _ G W
-W _ _ _ _ W
-W O W _ _ W
-W _ W B _ W
-W _ _ P _ W
-W W W W W W
+WWWWWW
+W___GW
+W____W
+WOW__W
+W_WB_W
+W__P_W
+WWWWWW
 
 ***
 
-W W W W W W
-W _ _ _ G W
-W _ _ _ _ W
-W O W B _ W
-W _ W P _ W
-W _ _ _ _ W
-W W W W W W
+WWWWWW
+W___GW
+W____W
+WOWB_W
+W_WP_W
+W____W
+WWWWWW
 
 ***
 
-W W W W W W
-W _ _ _ G W
-W _ _ B _ W
-W O W P _ W
-W _ W _ _ W
-W _ _ _ _ W
-W W W W W W
+WWWWWW
+W___GW
+W__B_W
+WOWP_W
+W_W__W
+W____W
+WWWWWW
 
 ***
 
-W W W W W W
-W _ _ _ G W
-W _ _ B _ W
-W O W _ P W
-W _ W _ _ W
-W _ _ _ _ W
-W W W W W W
+WWWWWW
+W___GW
+W__B_W
+WOW_PW
+W_W__W
+W____W
+WWWWWW
 
 ***
 
-W W W W W W
-W _ _ _ G W
-W _ _ B P W
-W O W _ _ W
-W _ W _ _ W
-W _ _ _ _ W
-W W W W W W
+WWWWWW
+W___GW
+W__BPW
+WOW__W
+W_W__W
+W____W
+WWWWWW
 
 ***
 
-W W W W W W
-W _ _ _ G W
-W _ B P _ W
-W O W _ _ W
-W _ W _ _ W
-W _ _ _ _ W
-W W W W W W
+WWWWWW
+W___GW
+W_BP_W
+WOW__W
+W_W__W
+W____W
+WWWWWW
 
 ***
 
-W W W W W W
-W _ _ _ G W
-W B P _ _ W
-W O W _ _ W
-W _ W _ _ W
-W _ _ _ _ W
-W W W W W W
+WWWWWW
+W___GW
+WBP__W
+WOW__W
+W_W__W
+W____W
+WWWWWW
 
 ***
 
-W W W W W W
-W _ P _ G W
-W B _ _ _ W
-W O W _ _ W
-W _ W _ _ W
-W _ _ _ _ W
-W W W W W W
+WWWWWW
+W_P_GW
+WB___W
+WOW__W
+W_W__W
+W____W
+WWWWWW
 
 ***
 
-W W W W W W
-W P _ _ G W
-W B _ _ _ W
-W O W _ _ W
-W _ W _ _ W
-W _ _ _ _ W
-W W W W W W
+WWWWWW
+WP__GW
+WB___W
+WOW__W
+W_W__W
+W____W
+WWWWWW
 
 ***
 
-W W W W W W
-W _ _ _ G W
-W P _ _ _ W
-W G W _ _ W
-W _ W _ _ W
-W _ _ _ _ W
-W W W W W W
+WWWWWW
+W___GW
+WP___W
+WGW__W
+W_W__W
+W____W
+WWWWWW
 
 ***
 
-W W W W W W
-W _ _ _ G W
-W P _ _ _ W
-W G W _ _ W
-W _ W _ _ W
-W _ _ _ _ W
-W W W W W W
+WWWWWW
+W___GW
+WP___W
+WGW__W
+W_W__W
+W____W
+WWWWWW
 
 ***
 
-W W W W W W
-W _ _ _ G W
-W P _ _ _ W
-W G W _ _ W
-W _ W _ _ W
-W _ _ _ _ W
-W W W W W W
+WWWWWW
+W___GW
+WP___W
+WGW__W
+W_W__W
+W____W
+WWWWWW
 
 ***
 
