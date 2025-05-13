@@ -1,63 +1,63 @@
-W W W W W W
-W _ D W _ W
-W _ W W _ W
-W _ _ _ P W
-W W W W W W
-W W W W W W
+WWWWWW
+W_DW_W
+W_WW_W
+W___PW
+WWWWWW
+WWWWWW
 
 ***
 
-W W W W W W
-W _ D W _ W
-W _ W W _ W
-W _ _ P _ W
-W W W W W W
-W W W W W W
+WWWWWW
+W_DW_W
+W_WW_W
+W__P_W
+WWWWWW
+WWWWWW
 
 ***
 
-W W W W W W
-W _ D W _ W
-W _ W W _ W
-W _ P _ _ W
-W W W W W W
-W W W W W W
+WWWWWW
+W_DW_W
+W_WW_W
+W_P__W
+WWWWWW
+WWWWWW
 
 ***
 
-W W W W W W
-W _ D W _ W
-W _ W W _ W
-W P _ _ _ W
-W W W W W W
-W W W W W W
+WWWWWW
+W_DW_W
+W_WW_W
+WP___W
+WWWWWW
+WWWWWW
 
 ***
 
-W W W W W W
-W _ D W _ W
-W P W W _ W
-W _ _ _ _ W
-W W W W W W
-W W W W W W
+WWWWWW
+W_DW_W
+WPWW_W
+W____W
+WWWWWW
+WWWWWW
 
 ***
 
-W W W W W W
-W P D W _ W
-W _ W W _ W
-W _ _ _ _ W
-W W W W W W
-W W W W W W
+WWWWWW
+WPDW_W
+W_WW_W
+W____W
+WWWWWW
+WWWWWW
 
 ***
 
-T T T T T T
-T T T T T T
-T T T T T T
-T T T T T T
-T T T T T T
-T T T T T T
+TTTTTT
+TTTTTT
+TTTTTT
+TTTTTT
+TTTTTT
+TTTTTT
 
 ***
 

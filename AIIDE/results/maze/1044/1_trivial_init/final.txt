@@ -1,99 +1,99 @@
-W W W W W W
-W W W W W W
-W _ _ _ _ W
-W P W W _ W
-W _ D W _ W
-W W W W W W
+WWWWWW
+WWWWWW
+W____W
+WPWW_W
+W_DW_W
+WWWWWW
 
 ***
 
-W W W W W W
-W W W W W W
-W _ _ _ _ W
-W _ W W _ W
-W P D W _ W
-W W W W W W
+WWWWWW
+WWWWWW
+W____W
+W_WW_W
+WPDW_W
+WWWWWW
 
 ***
 
-W W W W W W
-W W W W W W
-W _ _ _ _ W
-W _ W W _ W
-W P D W _ W
-W W W W W W
+WWWWWW
+WWWWWW
+W____W
+W_WW_W
+WPDW_W
+WWWWWW
 
 ***
 
-W W W W W W
-W W W W W W
-W _ _ _ _ W
-W _ W W _ W
-W P D W _ W
-W W W W W W
+WWWWWW
+WWWWWW
+W____W
+W_WW_W
+WPDW_W
+WWWWWW
 
 ***
 
-W W W W W W
-W W W W W W
-W _ _ _ _ W
-W _ W W _ W
-W P D W _ W
-W W W W W W
+WWWWWW
+WWWWWW
+W____W
+W_WW_W
+WPDW_W
+WWWWWW
 
 ***
 
-W W W W W W
-W W W W W W
-W _ _ _ _ W
-W _ W W _ W
-W P D W _ W
-W W W W W W
+WWWWWW
+WWWWWW
+W____W
+W_WW_W
+WPDW_W
+WWWWWW
 
 ***
 
-W W W W W W
-W W W W W W
-W _ _ _ _ W
-W _ W W _ W
-W P D W _ W
-W W W W W W
+WWWWWW
+WWWWWW
+W____W
+W_WW_W
+WPDW_W
+WWWWWW
 
 ***
 
-W W W W W W
-W W W W W W
-W _ _ _ _ W
-W _ W W _ W
-W P D W _ W
-W W W W W W
+WWWWWW
+WWWWWW
+W____W
+W_WW_W
+WPDW_W
+WWWWWW
 
 ***
 
-W W W W W W
-W W W W W W
-W _ _ _ _ W
-W _ W W _ W
-W P D W _ W
-W W W W W W
+WWWWWW
+WWWWWW
+W____W
+W_WW_W
+WPDW_W
+WWWWWW
 
 ***
 
-W W W W W W
-W W W W W W
-W _ _ _ _ W
-W _ W W _ W
-W P D W _ W
-W W W W W W
+WWWWWW
+WWWWWW
+W____W
+W_WW_W
+WPDW_W
+WWWWWW
 
 ***
 
-T T T T T T
-T T T T T T
-T T T T T T
-T T T T T T
-T T T T T T
-T T T T T T
+TTTTTT
+TTTTTT
+TTTTTT
+TTTTTT
+TTTTTT
+TTTTTT
 
 ***
 
