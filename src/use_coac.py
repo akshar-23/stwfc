@@ -5,6 +5,7 @@ from wfc.wfc import WaveFunctionCollapse
 from wfc.pattern import Pattern
 import os
 import time
+import argparse
 
 
 def initialize_path(grid_size):
@@ -190,7 +191,7 @@ def board_to_str(board):
     board_str = ""
     for row in board:
         row = ["." if x == "" else x for x in row]
-        row_str = "".join(row)
+        row_str = " ".join(row)
         board_str += row_str + "\n"
     return board_str[:-1]  # trim final \n
 
@@ -208,9 +209,7 @@ def save_level(level, raw_f, display_d):
             f.write(board_to_str(board))
 
 
-def process(
-    train_paths, initialize_fn, settings_fn, grid_size, pattern_size, num_tries
-):
+def process(train_paths, initialize_fn, settings_fn, grid_size, pattern_size, num_tries, outfile):
     np.random.seed(23)
     Pattern.set_format("char")
 
@@ -223,7 +222,7 @@ def process(
     for path in train_paths:
         train_levels += get_train_levels(path)
 
-    results_d = f"src/results/{time.time()}"
+    results_d = outfile
     Path(results_d).mkdir(parents=True, exist_ok=True)
     stats_f = f"{results_d}/stats.json"
     stats = {
@@ -273,19 +272,45 @@ def process(
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Run STWFC with custom parameters")
 
-    grid_size = (6, 4, 4)  # desired result grid shape (time, y, x)
-    pattern_size = (2, 3, 3)  # desired pattern shape (time, y, x)
+    parser.add_argument(
+        "--grid", nargs=3, type=int, default=[6, 4, 4],
+        help="Grid size in format T Y X (default: 6 4 4)"
+    )
+    parser.add_argument(
+        "--pattern", nargs=3, type=int, default=[2, 3, 3],
+        help="Pattern size in format T Y X (default: 2 3 3)"
+    )
+    parser.add_argument(
+        "--infile", nargs="+", default=[
+            "AIIDE/training/field/path_3_2_nw.json",
+            "AIIDE/training/field/path_1_nw.json"
+        ],
+        help="Input JSON file(s) or folder(s) (default: two example paths)"
+    )
+    parser.add_argument(
+        "--tries", type=int, default=10,
+        help="Number of tries to generate levels (default: 10)"
+    )
+    parser.add_argument(
+        "--outfile", type=str, default=None,
+        help="Optional name for the results output directory"
+    )
 
-    # list of paths to get example data from, recursively.
-    # Directories can ONLY contain json files
-    train_paths = [
-        f"AIIDE/training/field/path_3_2_nw.json",
-        f"AIIDE/training/field/path_1_nw.json",
-    ]
-    num_tries = 10  # number of times to attempt generating a level
+    args = parser.parse_args()
+
+    grid_size = tuple(args.grid)
+    pattern_size = tuple(args.pattern)
+    train_paths = args.infile
+    num_tries = args.tries
+
+    if args.outfile is None:
+        results_d = f"stwfc/src/results/{time.time()}"
+    else:
+        results_d = f"{args.outfile}"
 
     initialize_fn = initialize_path_noblank  # initializer for the game
     settings_fn = get_path_settings  # settings for the game
 
-    process(train_paths, initialize_fn, settings_fn, grid_size, pattern_size, num_tries)
+    process(train_paths, initialize_fn, settings_fn, grid_size, pattern_size, num_tries, results_d)
