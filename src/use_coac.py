@@ -275,6 +275,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run STWFC with custom parameters")
 
     parser.add_argument(
+        "--game", type=str, default="field",
+        help="Game is it for - field, field-nb, maze, lime, soko or block"
+    )
+    parser.add_argument(
         "--grid", nargs=3, type=int, default=[6, 4, 4],
         help="Grid size in format T Y X (default: 6 4 4)"
     )
@@ -305,12 +309,21 @@ if __name__ == "__main__":
     train_paths = args.infile
     num_tries = args.tries
 
+    game_initializers = {
+        "field": (initialize_path, get_path_settings),
+        "field-nb": (initialize_path_noblank, get_path_settings),
+        "maze": (initialize_maze, get_maze_settings),
+        "lime": (initialize_lime, get_lime_settings),
+        "soko": (initialize_soko, get_soko_settings),
+        "block": (initialize_block, get_block_settings),
+    }
+
+    initialize_fn, settings_fn = game_initializers.get(args.game, (initialize_path, get_path_settings))
+
+
     if args.outfile is None:
         results_d = f"stwfc/src/results/{time.time()}"
     else:
         results_d = f"{args.outfile}"
-
-    initialize_fn = initialize_path_noblank  # initializer for the game
-    settings_fn = get_path_settings  # settings for the game
 
     process(train_paths, initialize_fn, settings_fn, grid_size, pattern_size, num_tries, results_d)
