@@ -310,8 +310,7 @@ if __name__ == "__main__":
     num_tries = args.tries
 
     game_initializers = {
-        "field": (initialize_path, get_path_settings),
-        "field-nb": (initialize_path_noblank, get_path_settings),
+        "field": (initialize_path_noblank, get_path_settings),
         "maze": (initialize_maze, get_maze_settings),
         "lime": (initialize_lime, get_lime_settings),
         "soko": (initialize_soko, get_soko_settings),
